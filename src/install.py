@@ -59,83 +59,71 @@ logging.info('base_dir='+base_dir)
 os.system("mkdir "+base_dir)
 
 if options.repo:
-        print("installing from repo")
-        try:
-         aeoluslib.aeolus_cleanup()
-        except:
-         print("could not uninstall")
-        aeoluslib.addrepo()
-        aeoluslib.instpkg()
-        aeoluslib.aeolus_configure()
-        aeoluslib.check_services()
-        #aeoluslib.inst_dev_pkg()
-        #aeoluslib.pullsrc_compile()
+    print("installing from repo")
+    try:
+        aeoluslib.aeolus_cleanup()
+    except:
+        print("could not uninstall")
+    aeoluslib.addrepo()
+    aeoluslib.instpkg()
+    aeoluslib.aeolus_configure()
+    aeoluslib.check_services()
+    #aeoluslib.inst_dev_pkg()
+    #aeoluslib.pullsrc_compile()
 
 if options.src and options.dir:
-        
-        aeoluslib.aeolus_cleanup()
-        aeoluslib.addrepo()
-        aeoluslib.instpkg()
-        aeoluslib.inst_dev_pkg()
-        aeoluslib.pullsrc_compile_conductor(base_dir)
-        aeoluslib.inst_frm_src_conductor()
-        aeoluslib.aeolus_configure()
-        aeoluslib.check_services()
-
+    aeoluslib.aeolus_cleanup()
+    aeoluslib.addrepo()
+    aeoluslib.instpkg()
+    aeoluslib.inst_dev_pkg()
+    aeoluslib.pullsrc_compile_conductor(base_dir)
+    aeoluslib.inst_frm_src_conductor()
+    aeoluslib.aeolus_configure()
+    aeoluslib.check_services()
 
 if options.conductor and options.dir:
-        
-        aeoluslib.cleanup_aeolus()
-        aeoluslib.inst_dev_pkg()
-        aeoluslib.pullsrc_compile_conductor(base_dir)
-        aeoluslib.inst_frm_src_conductor()
-        aeoluslib.aeolus_configure()
-        aeoluslib.check_services()
-
+    aeoluslib.cleanup_aeolus()
+    aeoluslib.inst_dev_pkg()
+    aeoluslib.pullsrc_compile_conductor(base_dir)
+    aeoluslib.inst_frm_src_conductor()
+    aeoluslib.aeolus_configure()
+    aeoluslib.check_services()
 
 if options.oz and options.dir:
-          
-        aeoluslib.pullsrc_compile_Oz(base_dir)
-        aeoluslib.inst_frm_src_oz()
-
+    aeoluslib.pullsrc_compile_Oz(base_dir)
+    aeoluslib.inst_frm_src_oz()
 
 if options.factory and options.dir:
-        
-        aeoluslib.pullsrc_compile_image_factory(base_dir)
-        aeoluslib.inst_frm_src_image_factory()
-       
+    aeoluslib.pullsrc_compile_image_factory(base_dir)
+    aeoluslib.inst_frm_src_image_factory()
+
 if options.configure and options.dir:
-        aeoluslib.pullsrc_compile_Configure(base_dir)
-        aeoluslib.inst_frm_src_configure()
+    aeoluslib.pullsrc_compile_Configure(base_dir)
+    aeoluslib.inst_frm_src_configure()
 
 if options.iwhd and options.dir:
-        
-        aeoluslib.inst_dev_pkg_iwhd()
-        aeoluslib.pullsrc_compile_iwhd(base_dir)
-        aeoluslib.inst_frm_src_iwhd()
-
+    aeoluslib.inst_dev_pkg_iwhd()
+    aeoluslib.pullsrc_compile_iwhd(base_dir)
+    aeoluslib.inst_frm_src_iwhd()
 
 if options.audrey and options.dir:
-        
-        aeoluslib.pullsrc_compile_audry(base_dir)
-        aeoluslib.inst_frm_src_audry()
-
+    aeoluslib.pullsrc_compile_audry(base_dir)
+    aeoluslib.inst_frm_src_audry()
 
 if options.all and options.dir:
-       
-       aeoluslib.cleanup_aeolus()
-       aeoluslib.inst_dev_pkg()
-       aeoluslib.pullsrc_compile_conductor(basedir)
-       aeoluslib.inst_frm_src_conductor()
-       aeoluslib.aeolus_configure()
-       aeoluslib.check_services()
-       aeoluslib.pullsrc_compile_Oz(base_dir)
-       aeoluslib.inst_frm_src_oz()
-       aeoluslib.pullsrc_compile_image_factory(base_dir)
-       aeoluslib.inst_frm_src_image_factory()
-       aeoluslib.inst_dev_pkg_iwhd()
-       aeoluslib.pullsrc_compile_iwhd(base_dir)
-       aeoluslib.inst_frm_src_iwhd()
-       aeoluslib.pullsrc_compile_audry(base_dir)
-       aeoluslib.inst_frm_src_audry()
+    aeoluslib.cleanup_aeolus()
+    aeoluslib.inst_dev_pkg()
+    aeoluslib.pullsrc_compile_conductor(basedir)
+    aeoluslib.inst_frm_src_conductor()
+    aeoluslib.aeolus_configure()
+    aeoluslib.check_services()
+    aeoluslib.pullsrc_compile_Oz(base_dir)
+    aeoluslib.inst_frm_src_oz()
+    aeoluslib.pullsrc_compile_image_factory(base_dir)
+    aeoluslib.inst_frm_src_image_factory()
+    aeoluslib.inst_dev_pkg_iwhd()
+    aeoluslib.pullsrc_compile_iwhd(base_dir)
+    aeoluslib.inst_frm_src_iwhd()
+    aeoluslib.pullsrc_compile_audry(base_dir)
+    aeoluslib.inst_frm_src_audry()
 
