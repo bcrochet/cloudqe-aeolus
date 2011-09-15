@@ -73,7 +73,7 @@ Examples:
         default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
         help="Specify custom yum .repo file for use with --source=yum. (default: %default)")
     parser.add_option("-p", "--base_dir", action="store", dest="base_dir",
-        default=None help="providing a base dir for installation")
+        default=None, help="providing a base dir for installation")
     parser.add_option("--log", action="store", dest="logfile",
         default=None, help="Log output to a file")
     parser.add_option("-d", "--debug", action="store_true", dest="debug",
