@@ -1,1 +1,2 @@
-src/aeolus-script_1.1/output.log
+*.py[co]
+*.log
