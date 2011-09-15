@@ -26,104 +26,182 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-from optparse import OptionParser
-import subprocess as sub
 import os
-import shutil
-import aeoluslib
+import sys
+import optparse
 import logging
+import yum
 
-parser = OptionParser(usage="usage: %prog [options]\n ex: ./install.py -o --oz -p --base_dir '/home'", version="%prog 1.0")
-parser.add_option("-r", "--repo", action="store_true", dest="repo",   default=False, help="Install conductor from repo(does not require base dir)")
-parser.add_option("-s", "--src", action="store_true", dest="src",   default=False, help="Install conductor from src")
-parser.add_option("-u", "--all", action="store_true", dest="all",   default=False, help="Update all components from src")
-parser.add_option("-c", "--conductor", action="store_true", dest="conductor",   default=False, help="update conductor")
-parser.add_option("-o", "--oz", action="store_true", dest="oz",   default=False, help="update oz")
-parser.add_option("-f", "--factory", action="store_true", dest="factory",   default=False, help="update factory")
-parser.add_option("-i", "--iwhd", action="store_true", dest="iwhd", default=False, help="update iwhd")
-parser.add_option("-a", "--audrey", action="store_true", dest="audrey", default=False, help="update audrey")
-parser.add_option("-z", "--configure", action="store_true", dest="configure", default=False, help="update audrey")
-parser.add_option('-p','--base_dir', type='string',dest='dir',help='base dir of checkout')
-parser.add_option("-d", "--debug", action="store_true", dest="debug", default=False, help="print debug output",)
-(options, args) = parser.parse_args()
-base_dir = str(options.dir)
+try:
+    import aeoluslib
+except ImportError:
+    print "Unable to import aeoluslib.  Is aeoluslib in PYTHONPATH?"
+    sys.exit(1)
 
+def yum_var_subst(buf):
+    '''Convenience method to substitute instances of $releasever and $basearch
+    from yum's point of view.
+        ex: yum_var_subst('/tmp/$basearch/$releasever') -> '/tmp/x86_64/16'
+    '''
 
-LOG_FILENAME = 'output.log'
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(levelname)s %(message)s',
-                    filename=LOG_FILENAME,
-                    filemode='w')
+    yb = yum.YumBase()
+    yb.conf
+    for varname in ['releasever', 'basearch']:
+        buf = buf.replace('$'+varname, yb.yumvar[varname])
+    return buf
 
-logging.info('base_dir='+base_dir)
-os.system("mkdir "+base_dir)
+def parse_args():
+    #parser = optparse.OptionParser()
+    component_list = ['all', 'conductor', 'oz', 'factory', 'iwhd', 'audrey',]
+    usage_str = '''%%prog [options] <%s>
 
-if options.repo:
-    print("installing from repo")
-    try:
+Examples:
+ * Install oz from git
+   $ install.py --target=git --base_dir=/home oz
+ * Install audrey using yum
+   $ install.py --target=yum=/home audrey
+ * Install everything from git
+   $ install.py --target=git --base_dir=/home all''' % (','.join(component_list),)
+
+    parser = optparse.OptionParser(usage=usage_str)
+    source_choices = ["yum", "git"]
+    parser.add_option("--target", action="store", default=None,
+        type="choice", choices=source_choices,
+        help="Install source to use for install (options: %s)" %
+            ", ".join(source_choices))
+    parser.add_option("--repofile", action="append",
+        default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
+        help="Specify custom yum .repo file for use with --target=yum. (default: %default)")
+    parser.add_option("-p", "--base_dir", action="store", dest="base_dir",
+        default=False, help="providing a base dir for installation")
+    parser.add_option("--log", action="store", dest="logfile",
+        default=None, help="Log output to a file")
+    parser.add_option("-d", "--debug", action="store_true", dest="debug",
+        default=False, help="Enable debug output",)
+
+    (opts, args) = parser.parse_args()
+
+    # Sanitize target
+    o = parser.get_option("--target")
+    if opts.target not in o.choices:
+        parser.error("Must provide value for %s" % o.get_opt_string())
+
+    # Sanity --base_dir
+    if opts.target == 'git':
+        '''FIXME - sanitize opts.base_dir'''
+
+    elif opts.target == 'yum':
+        '''FIXME - sanitize opts.repofile'''
+
+    # Sanity component list
+    if len(args) <= 0:
+        parser.error("No component provided")
+    for a in args:
+        if a not in component_list:
+            parser.error("Unknown component selected: %s" % a)
+
+    return (opts, args)
+
+def setup_logging(debug=False, logfile=None):
+
+    # Normal or debug?
+    if debug:
+        logging_format = '%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s'
+    else:
+        logging_format = '%(asctime)s %(levelname)s %(message)s'
+
+    # Configure root logger
+    logging.basicConfig(level=opts.debug and logging.DEBUG or logging.INFO,
+                        format=logging_format,
+                        datefmt='%Y-%d-%m %I:%M:%S')
+
+    # Optionally attach a fileHandler
+    if logfile is not None:
+        logger = logging.getLogger()
+
+        filehandler = logging.FileHandler(logfile, 'a')
+        # Use format from root logger
+        filehandler.setFormatter(logging.Formatter(logger.handlers[0].formatter._fmt,
+                                 logger.handlers[0].formatter.datefmt))
+        logger.addHandler(filehandler)
+
+if __name__ == "__main__":
+
+    # Process arguments
+    (opts, args) = parse_args()
+
+    # Setup logging
+    setup_logging(opts.debug, opts.logfile)
+
+    logging.info('base_dir='+base_dir)
+    os.system("mkdir "+base_dir)
+
+    if options.repo:
+        print("installing from repo")
+        try:
+            aeoluslib.aeolus_cleanup()
+        except:
+            print("could not uninstall")
+        aeoluslib.addrepo()
+        aeoluslib.instpkg()
+        aeoluslib.aeolus_configure()
+        aeoluslib.check_services()
+        #aeoluslib.inst_dev_pkg()
+        #aeoluslib.pullsrc_compile()
+
+    if options.src and options.dir:
         aeoluslib.aeolus_cleanup()
-    except:
-        print("could not uninstall")
-    aeoluslib.addrepo()
-    aeoluslib.instpkg()
-    aeoluslib.aeolus_configure()
-    aeoluslib.check_services()
-    #aeoluslib.inst_dev_pkg()
-    #aeoluslib.pullsrc_compile()
+        aeoluslib.addrepo()
+        aeoluslib.instpkg()
+        aeoluslib.inst_dev_pkg()
+        aeoluslib.pullsrc_compile_conductor(base_dir)
+        aeoluslib.inst_frm_src_conductor()
+        aeoluslib.aeolus_configure()
+        aeoluslib.check_services()
 
-if options.src and options.dir:
-    aeoluslib.aeolus_cleanup()
-    aeoluslib.addrepo()
-    aeoluslib.instpkg()
-    aeoluslib.inst_dev_pkg()
-    aeoluslib.pullsrc_compile_conductor(base_dir)
-    aeoluslib.inst_frm_src_conductor()
-    aeoluslib.aeolus_configure()
-    aeoluslib.check_services()
+    if options.conductor and options.dir:
+        aeoluslib.cleanup_aeolus()
+        aeoluslib.inst_dev_pkg()
+        aeoluslib.pullsrc_compile_conductor(base_dir)
+        aeoluslib.inst_frm_src_conductor()
+        aeoluslib.aeolus_configure()
+        aeoluslib.check_services()
 
-if options.conductor and options.dir:
-    aeoluslib.cleanup_aeolus()
-    aeoluslib.inst_dev_pkg()
-    aeoluslib.pullsrc_compile_conductor(base_dir)
-    aeoluslib.inst_frm_src_conductor()
-    aeoluslib.aeolus_configure()
-    aeoluslib.check_services()
+    if options.oz and options.dir:
+        aeoluslib.pullsrc_compile_Oz(base_dir)
+        aeoluslib.inst_frm_src_oz()
 
-if options.oz and options.dir:
-    aeoluslib.pullsrc_compile_Oz(base_dir)
-    aeoluslib.inst_frm_src_oz()
+    if options.factory and options.dir:
+        aeoluslib.pullsrc_compile_image_factory(base_dir)
+        aeoluslib.inst_frm_src_image_factory()
 
-if options.factory and options.dir:
-    aeoluslib.pullsrc_compile_image_factory(base_dir)
-    aeoluslib.inst_frm_src_image_factory()
+    if options.configure and options.dir:
+        aeoluslib.pullsrc_compile_Configure(base_dir)
+        aeoluslib.inst_frm_src_configure()
 
-if options.configure and options.dir:
-    aeoluslib.pullsrc_compile_Configure(base_dir)
-    aeoluslib.inst_frm_src_configure()
+    if options.iwhd and options.dir:
+        aeoluslib.inst_dev_pkg_iwhd()
+        aeoluslib.pullsrc_compile_iwhd(base_dir)
+        aeoluslib.inst_frm_src_iwhd()
 
-if options.iwhd and options.dir:
-    aeoluslib.inst_dev_pkg_iwhd()
-    aeoluslib.pullsrc_compile_iwhd(base_dir)
-    aeoluslib.inst_frm_src_iwhd()
+    if options.audrey and options.dir:
+        aeoluslib.pullsrc_compile_audry(base_dir)
+        aeoluslib.inst_frm_src_audry()
 
-if options.audrey and options.dir:
-    aeoluslib.pullsrc_compile_audry(base_dir)
-    aeoluslib.inst_frm_src_audry()
-
-if options.all and options.dir:
-    aeoluslib.cleanup_aeolus()
-    aeoluslib.inst_dev_pkg()
-    aeoluslib.pullsrc_compile_conductor(basedir)
-    aeoluslib.inst_frm_src_conductor()
-    aeoluslib.aeolus_configure()
-    aeoluslib.check_services()
-    aeoluslib.pullsrc_compile_Oz(base_dir)
-    aeoluslib.inst_frm_src_oz()
-    aeoluslib.pullsrc_compile_image_factory(base_dir)
-    aeoluslib.inst_frm_src_image_factory()
-    aeoluslib.inst_dev_pkg_iwhd()
-    aeoluslib.pullsrc_compile_iwhd(base_dir)
-    aeoluslib.inst_frm_src_iwhd()
-    aeoluslib.pullsrc_compile_audry(base_dir)
-    aeoluslib.inst_frm_src_audry()
+    if options.all and options.dir:
+        aeoluslib.cleanup_aeolus()
+        aeoluslib.inst_dev_pkg()
+        aeoluslib.pullsrc_compile_conductor(basedir)
+        aeoluslib.inst_frm_src_conductor()
+        aeoluslib.aeolus_configure()
+        aeoluslib.check_services()
+        aeoluslib.pullsrc_compile_Oz(base_dir)
+        aeoluslib.inst_frm_src_oz()
+        aeoluslib.pullsrc_compile_image_factory(base_dir)
+        aeoluslib.inst_frm_src_image_factory()
+        aeoluslib.inst_dev_pkg_iwhd()
+        aeoluslib.pullsrc_compile_iwhd(base_dir)
+        aeoluslib.inst_frm_src_iwhd()
+        aeoluslib.pullsrc_compile_audry(base_dir)
+        aeoluslib.inst_frm_src_audry()
 
