@@ -73,7 +73,7 @@ Examples:
         default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
         help="Specify custom yum .repo file for use with --source=yum. (default: %default)")
     parser.add_option("-p", "--base_dir", action="store", dest="base_dir",
-        default=False, help="providing a base dir for installation")
+        default=None help="providing a base dir for installation")
     parser.add_option("--log", action="store", dest="logfile",
         default=None, help="Log output to a file")
     parser.add_option("-d", "--debug", action="store_true", dest="debug",
@@ -88,7 +88,8 @@ Examples:
 
     # Sanity --base_dir
     if opts.source == 'git':
-        '''FIXME - sanitize opts.base_dir'''
+        if opts.base_dir is None:
+            parser.error("Must provide --base_dir when using --source=git")
 
     elif opts.source == 'yum':
         '''FIXME - sanitize opts.repofile'''
@@ -160,7 +161,7 @@ if __name__ == "__main__":
         #aeoluslib.inst_dev_pkg()
         #aeoluslib.pullsrc_compile()
 
-    if opts.source == 'git' and opts.dir:
+    if opts.source == 'git': # and opts.dir:
         aeoluslib.aeolus_cleanup()
         aeoluslib.addrepo()
         aeoluslib.instpkg()
