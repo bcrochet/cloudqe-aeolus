@@ -148,36 +148,20 @@ if __name__ == "__main__":
             if e.errno != errno.EEXIST:
                 raise
 
+    # Prepare system with a fresh aeolus setup
+    aeoluslib.aeolus_cleanup()
+    aeoluslib.addrepo(opts.repofile)
+
+    # Install aeolus-conductor from git
     if opts.source == 'yum':
-        print("installing from repo")
-        try:
-            aeoluslib.aeolus_cleanup()
-        except:
-            print("could not uninstall")
-        aeoluslib.addrepo()
-        aeoluslib.instpkg()
-        aeoluslib.aeolus_configure()
-        aeoluslib.check_services()
-        #aeoluslib.inst_dev_pkg()
-        #aeoluslib.pullsrc_compile()
-
-    if opts.source == 'git': # and opts.dir:
-        aeoluslib.aeolus_cleanup()
-        aeoluslib.addrepo()
-        aeoluslib.instpkg()
-        aeoluslib.inst_dev_pkg()
+        aeoluslib.inst_aeolus()
+    elif opts.source == 'git' and is_requested('conductor', components):
+        aeoluslib.inst_aeolus_build_reqs()
         aeoluslib.pullsrc_compile_conductor(base_dir)
         aeoluslib.inst_frm_src_conductor()
-        aeoluslib.aeolus_configure()
-        aeoluslib.check_services()
 
-    if is_requested('conductor', components): # and opts.dir:
-        aeoluslib.cleanup_aeolus()
-        aeoluslib.inst_dev_pkg()
-        aeoluslib.pullsrc_compile_conductor(base_dir)
-        aeoluslib.inst_frm_src_conductor()
-        aeoluslib.aeolus_configure()
-        aeoluslib.check_services()
+    aeoluslib.aeolus_configure()
+    aeoluslib.check_services()
 
     if is_requested('oz', components): # and opts.dir:
         aeoluslib.pullsrc_compile_Oz(base_dir)
@@ -192,7 +176,7 @@ if __name__ == "__main__":
         aeoluslib.inst_frm_src_configure()
 
     if is_requested('iwhd', components): # and opts.dir:
-        aeoluslib.inst_dev_pkg_iwhd()
+        aeoluslib.inst_iwhd_buildreqs()
         aeoluslib.pullsrc_compile_iwhd(base_dir)
         aeoluslib.inst_frm_src_iwhd()
 

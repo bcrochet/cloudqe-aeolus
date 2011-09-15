@@ -35,51 +35,36 @@ rpmbuild_dir = os.path.expanduser(os.path.join('~','rpmbuild/'))
 rpmpath = os.path.expanduser(os.path.join('~','rpmbuild/RPMS/noarch/'))
 
 #Execute command
-def exec_command(cmdstring):
-    logging.debug(cmdstring)
+def exec_command(cmd):
+    logging.debug(cmd)
     p = subprocess.Popen(cmd, stderr=subprocess.STDOUT)
     (pout, perr) = p.communicate()
-    logging.debug("RC: %s" %  p.returncode)
+    logging.debug("rc: %s" %  p.returncode)
     return (p.returncode, pout)
 
 #Aeolus cleanup
 def aeolus_cleanup():
-    check_exist = 'rpm -qa | grep aeolus'
-    logging.info('Checking if old aeolus version is installed')
-    logging.info('running: %s' % check_exist)
-    #pdb.set_trace()
-    (v, o) = exec_command(check_exist)
-    logging.info('output:\n %s' % o)
-    logging.info('output:\n %s' % v)
-    if o:
-        aeolus_clean = 'aeolus-cleanup -v'
-        logging.info('running: %s' % aeolus_clean)
-        (rc, out) = exec_command(aeolus_clean)
-        logging.info('output:\n %s' % out)
-        uninstl_aeolus = ' yum -y remove  aeolus-all'
-        logging.info('running: %s' % uninstl_aeolus)
-        exec_command(uninstl_aeolus)
+    rc = 0 # assume pass
+    cmd = '/usr/sbin/aeolus-cleanup'
+    if os.path.isfile(cmd):
+        (rc, out) = exec_command(cmd + ' -v')
+        cmd = 'yum -y remove aeolus-all'
+        (rc, out) = exec_command(cmd)
     else:
-        logging.info('No old verison installed')
-
-#cleanup
-def  cleanup_aeolus():
-    logging.info('Checking which old aeolus version is installed')
-    check_exist = 'rpm -qa | grep aeolus'
-    logging.info('running: %s' % check_exist)
-    (v,o) = exec_command(check_exist)
-    logging.info('The aeolus version installed:\n %s' % o)
-    aeolus_clean = ' aeolus-cleanup'
-    logging.info('running: %s' % aeolus_clean)
-    exec_command(aeolus_clean)
+        logging.info('Skipping cleanup, aeolus-cleanup not found')
+    return rc
 
 # Add repo
-def addrepo(repofile):
-    cmd = "curl -O /etc/yum.repos.d/fedora-aeolus-testing.repo %s" % repofile
-    exec_command(cmd)
+def addrepo(repofiles):
+    if isinstance(repofiles, str):
+        repofiles = [repofiles]
+    for repofile in repofiles:
+        cmd = "curl -o /etc/yum.repos.d/%s/etc/yum.repos.d/fedora-aeolus-testing.repo %s" \
+            % (os.path.basename(repofile), repofile)
+        exec_command(cmd)
 
 #Install all the prerequisite aeolus packages
-def instpkg():
+def inst_aeolus():
     instpkg = ' yum -y install aeolus-all'
     logging.info('running: %s' % instpkg)
     exec_command(instpkg)
@@ -102,13 +87,13 @@ def check_services():
     logging.info('output:\n %s' % out)
 
 #Install the required development packages for conductor
-def inst_dev_pkg():
+def inst_conductor_buildreqs():
     instdevpkg = ' yum -y install classads-devel git rest-devel rpm-build ruby-devel zip '
     logging.info('running: %s' % instdevpkg)
     exec_command(instdevpkg)
 
 #Install the required development packages for iwhd
-def inst_dev_pkg_iwhd():
+def inst_iwhd_buildreqs():
     instdevpkg = ' yum install jansson-devel libmicrohttpd-devel hail-devel gc-devel git gperf mongodb-devel help2man mongodb-server'
     logging.info('running: %s' % instdevpkg)
     exec_command(instdevpkg)
