@@ -32,13 +32,6 @@ import errno
 import logging
 import pdb
 
-
-
-LOG_FILENAME = 'output.log'
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(levelname)s %(message)s',
-                    filename=LOG_FILENAME,
-                    filemode='w')
 rpmbuild_dir = os.path.expanduser(os.path.join('~','rpmbuild/'))
 rpmpath = os.path.expanduser(os.path.join('~','rpmbuild/RPMS/noarch/'))
 

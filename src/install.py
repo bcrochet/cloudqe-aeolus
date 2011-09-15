@@ -25,12 +25,12 @@
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
 import os
 import sys
 import optparse
 import logging
 import yum
+import errno
 
 try:
     import aeoluslib
@@ -52,26 +52,26 @@ def yum_var_subst(buf):
 
 def parse_args():
     #parser = optparse.OptionParser()
-    component_list = ['all', 'conductor', 'oz', 'factory', 'iwhd', 'audrey',]
+    component_list = ['all', 'conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey',]
     usage_str = '''%%prog [options] <%s>
 
 Examples:
  * Install oz from git
-   $ install.py --target=git --base_dir=/home oz
+   $ install.py --source=git --base_dir=/home oz
  * Install audrey using yum
-   $ install.py --target=yum=/home audrey
+   $ install.py --source=yum=/home audrey
  * Install everything from git
-   $ install.py --target=git --base_dir=/home all''' % (','.join(component_list),)
+   $ install.py --source=git --base_dir=/home all''' % (','.join(component_list),)
 
     parser = optparse.OptionParser(usage=usage_str)
     source_choices = ["yum", "git"]
-    parser.add_option("--target", action="store", default=None,
+    parser.add_option("--source", action="store", default=None,
         type="choice", choices=source_choices,
         help="Install source to use for install (options: %s)" %
             ", ".join(source_choices))
     parser.add_option("--repofile", action="append",
         default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
-        help="Specify custom yum .repo file for use with --target=yum. (default: %default)")
+        help="Specify custom yum .repo file for use with --source=yum. (default: %default)")
     parser.add_option("-p", "--base_dir", action="store", dest="base_dir",
         default=False, help="providing a base dir for installation")
     parser.add_option("--log", action="store", dest="logfile",
@@ -81,16 +81,16 @@ Examples:
 
     (opts, args) = parser.parse_args()
 
-    # Sanitize target
-    o = parser.get_option("--target")
-    if opts.target not in o.choices:
+    # Sanitize source
+    o = parser.get_option("--source")
+    if opts.source not in o.choices:
         parser.error("Must provide value for %s" % o.get_opt_string())
 
     # Sanity --base_dir
-    if opts.target == 'git':
+    if opts.source == 'git':
         '''FIXME - sanitize opts.base_dir'''
 
-    elif opts.target == 'yum':
+    elif opts.source == 'yum':
         '''FIXME - sanitize opts.repofile'''
 
     # Sanity component list
@@ -125,18 +125,29 @@ def setup_logging(debug=False, logfile=None):
                                  logger.handlers[0].formatter.datefmt))
         logger.addHandler(filehandler)
 
+def is_requested(comp, requested):
+    if comp in requested or 'all' in requested:
+        return True
+    return False
+
 if __name__ == "__main__":
 
     # Process arguments
-    (opts, args) = parse_args()
+    (opts, components) = parse_args()
 
     # Setup logging
     setup_logging(opts.debug, opts.logfile)
 
-    logging.info('base_dir='+base_dir)
-    os.system("mkdir "+base_dir)
+    if opts.source == 'git':
+        # FIXME - this needs to move into a module somewhere
+        logging.debug('base_dir: %s' % opts.base_dir)
+        try:
+            os.makedirs('a/b/c')
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
 
-    if options.repo:
+    if opts.source == 'yum':
         print("installing from repo")
         try:
             aeoluslib.aeolus_cleanup()
@@ -149,7 +160,7 @@ if __name__ == "__main__":
         #aeoluslib.inst_dev_pkg()
         #aeoluslib.pullsrc_compile()
 
-    if options.src and options.dir:
+    if opts.source == 'git' and opts.dir:
         aeoluslib.aeolus_cleanup()
         aeoluslib.addrepo()
         aeoluslib.instpkg()
@@ -159,7 +170,7 @@ if __name__ == "__main__":
         aeoluslib.aeolus_configure()
         aeoluslib.check_services()
 
-    if options.conductor and options.dir:
+    if is_requested('conductor', components): # and opts.dir:
         aeoluslib.cleanup_aeolus()
         aeoluslib.inst_dev_pkg()
         aeoluslib.pullsrc_compile_conductor(base_dir)
@@ -167,41 +178,23 @@ if __name__ == "__main__":
         aeoluslib.aeolus_configure()
         aeoluslib.check_services()
 
-    if options.oz and options.dir:
+    if is_requested('oz', components): # and opts.dir:
         aeoluslib.pullsrc_compile_Oz(base_dir)
         aeoluslib.inst_frm_src_oz()
 
-    if options.factory and options.dir:
+    if is_requested('imagefactory', components): # and opts.dir:
         aeoluslib.pullsrc_compile_image_factory(base_dir)
         aeoluslib.inst_frm_src_image_factory()
 
-    if options.configure and options.dir:
+    if is_requested('configure', components): # and opts.dir:
         aeoluslib.pullsrc_compile_Configure(base_dir)
         aeoluslib.inst_frm_src_configure()
 
-    if options.iwhd and options.dir:
+    if is_requested('iwhd', components): # and opts.dir:
         aeoluslib.inst_dev_pkg_iwhd()
         aeoluslib.pullsrc_compile_iwhd(base_dir)
         aeoluslib.inst_frm_src_iwhd()
 
-    if options.audrey and options.dir:
+    if is_requested('audrey', components): # and opts.dir:
         aeoluslib.pullsrc_compile_audry(base_dir)
         aeoluslib.inst_frm_src_audry()
-
-    if options.all and options.dir:
-        aeoluslib.cleanup_aeolus()
-        aeoluslib.inst_dev_pkg()
-        aeoluslib.pullsrc_compile_conductor(basedir)
-        aeoluslib.inst_frm_src_conductor()
-        aeoluslib.aeolus_configure()
-        aeoluslib.check_services()
-        aeoluslib.pullsrc_compile_Oz(base_dir)
-        aeoluslib.inst_frm_src_oz()
-        aeoluslib.pullsrc_compile_image_factory(base_dir)
-        aeoluslib.inst_frm_src_image_factory()
-        aeoluslib.inst_dev_pkg_iwhd()
-        aeoluslib.pullsrc_compile_iwhd(base_dir)
-        aeoluslib.inst_frm_src_iwhd()
-        aeoluslib.pullsrc_compile_audry(base_dir)
-        aeoluslib.inst_frm_src_audry()
-
