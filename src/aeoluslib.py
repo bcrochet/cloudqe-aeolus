@@ -59,8 +59,8 @@ def addrepo(repofiles):
     if isinstance(repofiles, str):
         repofiles = [repofiles]
     for repofile in repofiles:
-        cmd = "curl -o /etc/yum.repos.d/%s/etc/yum.repos.d/fedora-aeolus-testing.repo %s" \
-            % (os.path.basename(repofile), repofile)
+        cmd = "curl -o /etc/yum.repos.d/%s %s" % (os.path.basename(repofile),
+            repofile)
         exec_command(cmd)
 
 #Install all the prerequisite aeolus packages
