@@ -30,7 +30,6 @@ import sys
 import optparse
 import logging
 import yum
-import errno
 
 try:
     import aeoluslib
@@ -70,8 +69,9 @@ Examples:
         help="Install source to use for install (options: %s)" %
             ", ".join(source_choices))
     parser.add_option("--repofile", action="append",
-        default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
-        help="Specify custom yum .repo file for use with --source=yum. (default: %default)")
+        #default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
+        default=[],
+        help="Specify custom yum .repo file(s) for use with --source=yum. (default: %default)")
     parser.add_option("-p", "--base_dir", action="store", dest="base_dir",
         default=None, help="providing a base dir for installation")
     parser.add_option("--log", action="store", dest="logfile",
@@ -92,7 +92,7 @@ Examples:
             parser.error("Must provide --base_dir when using --source=git")
 
     elif opts.source == 'yum':
-        '''FIXME - sanitize opts.repofile'''
+        '''FIXME - optionally sanitize opts.repofile'''
 
     # Sanity component list
     if len(args) <= 0:
@@ -108,17 +108,26 @@ def setup_logging(debug=False, logfile=None):
     # Normal or debug?
     if debug:
         logging_format = '%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s'
+        logging_level = logging.DEBUG
     else:
         logging_format = '%(asctime)s %(levelname)s %(message)s'
+        logging_level = logging.INFO
 
     # Configure root logger
-    logging.basicConfig(level=opts.debug and logging.DEBUG or logging.INFO,
+    # FIXME - the following isn't properly setting level ... not sure why
+    logging.basicConfig(level=logging_level,
                         format=logging_format,
                         datefmt='%Y-%d-%m %I:%M:%S')
 
+    logger = logging.getLogger()
+    logger.setLevel(logging_level)
+
     # Optionally attach a fileHandler
     if logfile is not None:
-        logger = logging.getLogger()
+        try:
+            logger
+        except NameError: # in case someone fixes basicConfig above
+            logger = logging.getLogger()
 
         filehandler = logging.FileHandler(logfile, 'a')
         # Use format from root logger
@@ -139,47 +148,58 @@ if __name__ == "__main__":
     # Setup logging
     setup_logging(opts.debug, opts.logfile)
 
-    if opts.source == 'git':
-        # FIXME - this needs to move into a module somewhere
-        logging.debug('base_dir: %s' % opts.base_dir)
-        try:
-            os.makedirs('a/b/c')
-        except OSError, e:
-            if e.errno != errno.EEXIST:
-                raise
+    # FIXME - detect whether running in SELinux enforcing
+    # FIXME - remind about firewall changes?
 
-    # Prepare system with a fresh aeolus setup
-    aeoluslib.aeolus_cleanup()
-    aeoluslib.addrepo(opts.repofile)
+    if opts.repofile:
+        aeoluslib.add_custom_repo(opts.repofile)
+
+    # Define a base_dir for all git operations
+    if opts.source == 'git':
+        aeoluslib.workdir = opts.base_dir
+
+    # Cleanup any stale existing configuration
+    conductor = aeoluslib.Conductor()
+    if conductor.is_installed():
+        conductor.uninstall()
+
+    # If configure is already installed, clean it up
+    configure = aeoluslib.Configure()
+    if configure.is_installed():
+        configure.uninstall()
+
+    # Install fresh out of the oven
+    aeoluslib.yum_install('aeolus-all')
 
     # Install aeolus-conductor from git
-    if opts.source == 'yum':
-        aeoluslib.inst_aeolus()
-    elif opts.source == 'git' and is_requested('conductor', components):
-        aeoluslib.inst_aeolus_build_reqs()
-        aeoluslib.pullsrc_compile_conductor(base_dir)
-        aeoluslib.inst_frm_src_conductor()
+    if opts.source == 'git' and is_requested('conductor', components):
+        conductor.install_from_scm()
+    if opts.source == 'git' and is_requested('configure', components):
+        configure.install_from_scm()
 
-    aeoluslib.aeolus_configure()
-    aeoluslib.check_services()
+    # Enable and start aeolus services
+    configure.setup()
+    conductor.enable()
+    conductor.restart()
 
-    if is_requested('oz', components): # and opts.dir:
-        aeoluslib.pullsrc_compile_Oz(base_dir)
-        aeoluslib.inst_frm_src_oz()
+    # FIXME - are we looking for a specific result/output from
+    # aeolus-check-services?
+    aeoluslib.call('/usr/bin/aeolus-check-services')
 
-    if is_requested('imagefactory', components): # and opts.dir:
-        aeoluslib.pullsrc_compile_image_factory(base_dir)
-        aeoluslib.inst_frm_src_image_factory()
+    for request in ['oz', 'imagefactory', 'iwhd', 'audrey']:
+        if is_requested(request, components):
+            cls_name = request.capitalize()
+            if not hasattr(aeoluslib, cls_name):
+                logging.error("Unable to find aeoluslib.%s" % cls_name)
+                sys.exit(1)
 
-    if is_requested('configure', components): # and opts.dir:
-        aeoluslib.pullsrc_compile_Configure(base_dir)
-        aeoluslib.inst_frm_src_configure()
+            cls_obj = getattr(aeoluslib, cls_name)
+            cls_inst = cls_obj()
 
-    if is_requested('iwhd', components): # and opts.dir:
-        aeoluslib.inst_iwhd_buildreqs()
-        aeoluslib.pullsrc_compile_iwhd(base_dir)
-        aeoluslib.inst_frm_src_iwhd()
+            if opts.source == 'yum':
+                cls_inst.install()
+            elif opts.source == 'git':
+                cls_inst.install_from_scm()
 
-    if is_requested('audrey', components): # and opts.dir:
-        aeoluslib.pullsrc_compile_audry(base_dir)
-        aeoluslib.inst_frm_src_audry()
+            # FIXME - enable imagefactory service
+            # FIXME - enable iwhd service

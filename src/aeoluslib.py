@@ -1,10 +1,8 @@
 #!/usr/bin/env python
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# Description: aeolus install library functions
-# Author: Aziza Karol <akarol@redhat.com>
+# aeoluslib.py - Helper library for installing and enabling aeolus*
+#
 # Copyright (C) 2011  Red Hat
-# see file 'COPYING' for use and warranty information
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -19,305 +17,312 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Author(s): Aziza Karol <akarol@redhat.com>
+#            James Laska <jlaska@redhat.com>
+#
 
-import subprocess
-import time
-import sys
 import os
+import subprocess
 import shutil
 import re
 import errno
 import logging
-import pdb
+import tempfile
+import shlex
+from rpmUtils.miscutils import splitFilename
 
-rpmbuild_dir = os.path.expanduser(os.path.join('~','rpmbuild/'))
-rpmpath = os.path.expanduser(os.path.join('~','rpmbuild/RPMS/noarch/'))
+workdir = None
 
-#Execute command
-def exec_command(cmd):
-    logging.debug(cmd)
-    p = subprocess.Popen(cmd, stderr=subprocess.STDOUT)
-    (pout, perr) = p.communicate()
-    logging.debug("rc: %s" %  p.returncode)
-    return (p.returncode, pout)
-
-#Aeolus cleanup
-def aeolus_cleanup():
-    rc = 0 # assume pass
-    cmd = '/usr/sbin/aeolus-cleanup'
-    if os.path.isfile(cmd):
-        (rc, out) = exec_command(cmd + ' -v')
-        cmd = 'yum -y remove aeolus-all'
-        (rc, out) = exec_command(cmd)
-    else:
-        logging.info('Skipping cleanup, aeolus-cleanup not found')
-    return rc
-
-# Add repo
-def addrepo(repofiles):
+def prepare_system(repofiles=[]):
     if isinstance(repofiles, str):
         repofiles = [repofiles]
     for repofile in repofiles:
         cmd = "curl -o /etc/yum.repos.d/%s %s" % (os.path.basename(repofile),
             repofile)
-        exec_command(cmd)
+        (rc, out) = call(cmd)
 
-#Install all the prerequisite aeolus packages
-def inst_aeolus():
-    instpkg = ' yum -y install aeolus-all'
-    logging.info('running: %s' % instpkg)
-    exec_command(instpkg)
+    # Install basic packages
+    call('yum install -y classads-devel git rest-devel rpm-build ruby-devel zip')
 
-#aeolus-configure
-def aeolus_configure():
-    print("running configure")
-    ae_conf = ' aeolus-configure'
-    logging.info('running: %s' % ae_conf)
-    out = exec_command(ae_conf)
-    logging.info("wes")
-    logging.info('output:\n %s' % out)
+class AeolusModule(object):
+    # Module name (defaults to __class__.__name__.lower())
+    name = None
+    # SCM URL (only git right now)
+    git_url = None
+    # Shell command needed to build RPMs from SCM
+    package_cmd = 'make rpms'
+    # RPM BuildRequires for specific module
+    build_requires = None
 
-#run check_services
-def check_services():
-    #os.chdir('/home/aeolus-script')
-    chk_service = '/usr/bin/aeolus-check-services'
-    logging.info('running: %s' % chk_service )
-    out = exec_command(chk_service)
-    logging.info('output:\n %s' % out)
+    def __init__(self, **kwargs):
+        if hasattr(self, 'name') and self.name is None:
+            self.name = self.__class__.__name__.lower()
 
-#Install the required development packages for conductor
-def inst_conductor_buildreqs():
-    instdevpkg = ' yum -y install classads-devel git rest-devel rpm-build ruby-devel zip '
-    logging.info('running: %s' % instdevpkg)
-    exec_command(instdevpkg)
+        # Define a work directory for any checkouts or temp files
+        if kwargs.has_key('workdir'):
+            self.workdir = os.path.join(kwargs.get('workdir'), self.name)
+            makedirs(self.workdir)
+        elif workdir is not None:
+            self.workdir = workdir
+            makedirs(self.workdir)
+        else:
+            self.workdir = tempfile.mkdtemp(suffix='.%s' % self.name)
 
-#Install the required development packages for iwhd
-def inst_iwhd_buildreqs():
-    instdevpkg = ' yum install jansson-devel libmicrohttpd-devel hail-devel gc-devel git gperf mongodb-devel help2man mongodb-server'
-    logging.info('running: %s' % instdevpkg)
-    exec_command(instdevpkg)
+    def setup(self):
+        raise NotImplemented("Not implemented by derived object")
 
-component_cond = 'conductor'
-#Clone the Conductor git repository and compile
-def pullsrc_compile_conductor(base_dir):
-    clone_cond_dir = os.path.join(base_dir,component_cond)
-    if os.path.exists(clone_cond_dir):
-        logging.info('Removing existing cloned git repo that was detected...')
-        shutil.rmtree(clone_cond_dir)
-    logging.info('Cloning the conductor git repositiry')
-    #os.makedirs(base_dir)
-    os.chdir(base_dir)
-    clone = ' git clone git://git.fedorahosted.org/git/aeolus/conductor.git'
-    logging.info('running: %s' % clone)
-    exec_command(clone)
-    if os.path.exists(rpmbuild_dir):
-        logging.info('Removing existing rpmbuild dir that was detected...')
-        shutil.rmtree(rpmbuild_dir)
-    os.chdir(clone_cond_dir)
-    mkrpms = 'make rpms'
-    logging.info('running: %s' % mkrpms)
-    exec_command(mkrpms)
+    # NOTE: Isn't always called when object is removed (search interwebs for reasons)
+    def __del__(self):
+        self._cleanup()
 
-#install conductor from source
-def inst_frm_src_conductor():
-    logging.info('Installing rpms from src')
-    os.chdir(rpmpath)
-    rpm_install = ' yum -y localinstall aeolus* --nogpgcheck'
-    logging.info('running: %s' % rpm_install)
-    exec_command(rpm_install)
-    check_exist = 'rpm -qa | grep aeolus'
-    logging.info('running: %s' % check_exist)
-    (v, o) = exec_command(check_exist)
-    logging.info('The aeolus version installed:\n %s' % o)
+    def _cleanup(self):
+        '''Remove self.workdir'''
+        if hasattr(self, 'workdir') and os.path.isdir(self.workdir):
+            try:
+                shutil.rmtree(self.workdir)
+            except OSError, e:
+                print e
 
-component_oz = 'oz'
-#clone the Oz git repository and compile
-def pullsrc_compile_Oz(base_dir):
-    print('base_dir= '+base_dir)
-    clone_Oz_dir = os.path.join(base_dir,component_oz)
-    if os.path.exists(clone_Oz_dir):
-        logging.info('Removing existing cloned git repo that was detected...')
-        shutil.rmtree(clone_Oz_dir)
-    logging.info('Cloning the Oz git repositiry')
-    os.chdir(base_dir)
-    clone = ' git clone git://github.com/clalancette/oz.git'
-    logging.info('running: %s' % clone)
-    exec_command(clone)
-    if os.path.exists(rpmbuild_dir):
-        logging.info('Removing existing rpmbuild dir that was detected...')
-        shutil.rmtree(rpmbuild_dir)
-    print clone_Oz_dir
-    os.chdir(clone_Oz_dir)
-    mkrpms = 'make rpm'
-    logging.info('running: %s' % mkrpms)
-    exec_command(mkrpms)
+    def _install_buildreqs(self):
 
-#pull and build configure
-component_configure = 'configure'
-def pullsrc_compile_Configure(base_dir):
-    require_rpms ='rubygem-rspec.noarch rpm-build'
-    logging.info('installing required rpms '+require_rpms)
-    exec_command('yum -y install '+require_rpms)
-    clone_Configure_dir = os.path.join(base_dir,component_configure)
-    if os.path.exists(clone_Configure_dir):
-        logging.info('Removing existing cloned git repo')
-        shutil.rmtree(clone_Configure_dir)
-    logging.info('Cloning aeolus configure repoistory')
-    os.chdir(base_dir)
-    clone = 'git clone git://git.fedorahosted.org/aeolus/configure.git'
-    logging.info('running: '+ clone)
-    exec_command(clone)
-    if os.path.exists(rpmbuild_dir):
-        logging.info('Removing existing rpmbuild dir that was detected...')
-        shutil.rmtree(rpmbuild_dir)
-    print(clone_Configure_dir)
-    os.chdir(clone_Configure_dir)
-    mkrpms = 'rake rpms'
-    logging.info('running: %s' % mkrpms)
-    exec_command(mkrpms)
+        if self.build_requires is None or \
+           self.build_requires == '':
+            logging.debug("No build requires provided, detecting...")
 
-#install oz from source
-def inst_frm_src_oz():
-    check_oz = 'rpm -qa | grep oz'
-    logging.info('running: %s' % check_oz)
-    (v, o) = exec_command(check_oz)
-    logging.info('The oz version installed before updating:\n %s' % o)
-    logging.info('Installing rpms from src')
-    os.chdir(rpmpath)
-    rpm_install = ' yum -y localinstall oz* --nogpgcheck'
-    logging.info('running: %s' % rpm_install)
-    exec_command(rpm_install)
-    (v, o) = exec_command(check_oz)
-    logging.info('The updated oz version installed:\n %s' % o)
+            # Find any files that look like .spec files
+            specfiles = list()
+            for root, dirs, files in os.walk(self.workdir):
+                specfiles += [os.path.join(root, spec) for spec in files \
+                                if '.spec' in spec]
 
-#install configure from source
-def inst_frm_src_configure():
-    check_configure = 'rpm -qa | grep aeolus-configure'
-    logging.info('running: %s' % check_configure)
-    (v, o) = exec_command(check_configure)
-    logging.info('The configure version installed before updating:\n %s' % o)
-    logging.info('Installing rpms from src')
-    os.chdir(rpmpath)
-    rpm_install = ' yum -y localinstall aeolus-configure* --nogpgcheck'
-    logging.info('running: %s' % rpm_install)
-    exec_command(rpm_install)
-    (v, o) = exec_command(check_configure)
-    logging.info('The updated aeolus-configure version installed:\n %s' % o)
+            # Gather any 'BuildRequires' from the spec files
+            build_requires = list()
+            for spec in specfiles:
+                build_requires += re.findall(r'^BuildRequires:\s*([^\n, ]*)',
+                    open(spec, 'r').read(), re.MULTILINE)
 
-component_factory = 'imagefactory'
-#clone the image_factory git repository and compile
-def pullsrc_compile_image_factory(base_dir):
-    clone_imgfact_dir = os.path.join(base_dir,component_factory)
-    if os.path.exists(clone_imgfact_dir):
-        logging.info('Removing existing cloned git repo that was detected...')
-        shutil.rmtree(clone_imgfact_dir)
-    logging.info('Cloning the imagefactory git repositiry')
-    os.chdir(base_dir)
-    clone = ' git clone https://github.com/aeolusproject/imagefactory'
-    logging.info('running: %s' % clone)
-    exec_command(clone)
-    if os.path.exists(rpmbuild_dir):
-        logging.info('Removing existing rpmbuild dir that was detected...')
-        shutil.rmtree(rpmbuild_dir)
-    os.chdir(clone_imgfact_dir)
-    mkrpms = 'make rpm'
-    logging.info('running: %s' % mkrpms)
-    exec_command(mkrpms)
+            if len(build_requires) > 0:
+                self.build_requires = ' '.join(build_requires)
+            else:
+                logging.warn("Unable to detect buildrequires for '%s'" % \
+                    self.name)
 
-#install imagefactory from source
-def inst_frm_src_image_factory():
-    check_factory = 'rpm -qa | grep imagefactory'
-    logging.info('running: %s' % check_factory)
-    (v, o) = exec_command(check_factory)
-    logging.info('The imagefactory version installed before updating:\n %s' % o)
-    logging.info('Installing rpms from src')
-    os.chdir(rpmpath)
-    rpm_install = ' yum -y localinstall *noarch.rpm --nogpgcheck'
-    logging.info('running: %s' % rpm_install)
-    exec_command(rpm_install)
-    (v, o) = exec_command(check_factory)
-    logging.info('The updated imagefactory version installed:\n %s' % o)
+        yum_install_if_needed(self.build_requires)
+
+    def is_installed(self):
+        '''install package via RPM'''
+        (rc, out) = call('rpm --quiet -q %s' % self.name, raiseExc=False)
+        return rc == 0  # 0=pass
+
+    def uninstall(self):
+        '''uninstall rpm package'''
+        (rc, out) = call('yum -y remove %s' % self.name)
+        return rc == 0  # 0=pass
+
+    def install(self):
+        '''install package via RPM'''
+        call('yum -y install %s' % self.name)
+
+    def chkconfig(self, cmd, serviceName=None):
+        '''Unsing chkconfig, enable the service on boot'''
+        if cmd.lower() not in ['on', 'off']:
+            raise Exception("Unknown chkconfig command: %s" % cmd)
+        call('chkconfig %s %s' % (serviceName or self.name, cmd))
+
+    def _svc_cmd(self, service, serviceName=None):
+        '''Using servic, start the service'''
+        call('service %s %s' % (serviceName or self.name, service))
+
+    def svc_start(self, serviceName=None):
+        self._svc_cmd('start', serviceName)
+
+    def svc_restart(self, serviceName=None):
+        self._svc_cmd('restart', serviceName)
+
+    def svc_stop(self, serviceName=None):
+        self._svc_cmd('stop', serviceName)
+
     logging.info('Restarting Imagefactory  service...')
     chk_status = '/etc/init.d/imagefactory  restart'
-    logging.info('running: %s' % chk_status)
-    exec_command(chk_status)
+    def _clone_from_scm(self):
+        '''checkout package from version control'''
+        if not hasattr(self, 'git_url') or self.git_url is None:
+            raise Exception("Module has no self.git_url defined")
 
-component_iwhd = 'iwhd'
-iwhd_rpmpath = '~/rpmbuild/RPMS/x86_64'
-#clone the iwhd git repository and compile
-def pullsrc_compile_iwhd(base_dir):
-    clone_iwhd_dir = os.path.join(base_dir,component_iwhd)
-    if os.path.exists(clone_iwhd_dir):
-        logging.info('Removing existing cloned git repo that was detected...')
-        shutil.rmtree(clone_iwhd_dir)
-    logging.info('Cloning the iwhd git repositiry')
-    os.chdir(base_dir)
-    clone = ' git clone git://git.fedorahosted.org/iwhd.git'
-    logging.info('running: %s' % clone)
-    exec_command(clone)
-    if os.path.exists(rpmbuild_dir):
-        logging.info('Removing existing rpmbuild dir that was detected...')
-        shutil.rmtree(rpmbuild_dir)
-        #os.system('rm -rf rpmbuild_dir')
-    os.chdir(clone_iwhd_dir)
-    btstrap = './bootstrap'
-    logging.info('running: %s' % btstrap)
-    exec_command(btstrap)
-    configure = './configure --quiet'
-    logging.info('running: %s' % configure)
-    exec_command(configure)
-    mkrpms = 'make rpm'
-    logging.info('running: %s' % mkrpms)
-    exec_command(mkrpms)
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.workdir)
+            (rc, clone_log) = call('git clone %s %s' % (self.git_url, self.workdir))
+        finally:
+            # return to old directory
+            if os.getcwd() != cwd:
+                os.chdir(cwd)
+        self.cloned = True
 
-#install iwhd from source
-def inst_frm_src_iwhd():
-    check_iwhd = 'rpm -qa | grep iwhd'
-    logging.info('running: %s' % check_iwhd)
-    (v, o) = exec_command(check_iwhd)
-    logging.info('The iwhd version installed before updating:\n %s' % o)
-    logging.info('Installing rpms from src')
-    os.chdir(iwhd_rpmpath)
-    rpm_install = ' yum -y localinstall iwhd* --nogpgcheck'
-    logging.info('running: %s' % rpm_install)
-    exec_command(rpm_install)
-    (v, o) = exec_command(check_iwhd)
-    logging.info('The updated iwhd version installed:\n %s' % o)
-    logging.info('Restarting mongodb server dependency...')
-    chk_status = '/etc/init.d/mongod  restart'
-    logging.info('running: %s' % chk_status)
-    exec_command(chk_status)
-    logging.info('Restarting iwhd  service...')
-    chk_status = '/etc/init.d/iwhd  restart'
-    logging.info('running: %s' % chk_status)
-    exec_command(chk_status)
+    def _make_rpms(self):
+        '''Runs self.package_cmd and returns a list of built packages'''
+        cwd = os.getcwd()
+        build_log = ''
+        try:
+            os.chdir(self.workdir)
+            (rc, build_log) = call(self.package_cmd)
+        finally:
+            # return to old directory
+            if os.getcwd() != cwd:
+                os.chdir(cwd)
 
-component_aud = 'audrey'
-#clone the audery git repository and compile
-def pullsrc_compile_audry(base_dir):
-    clone_audrey_dir = os.path.join(base_dir,component_aud)
-    config_path = clone_audrey_dir + 'configserver'
-    if os.path.exists(clone_audrey_dir):
-        logging.info('Removing existing cloned git repo that was detected...')
-        shutil.rmtree(clone_audrey_dir)
-    logging.info('Cloning the audrey git repositiry')
-    os.chdir(base_dir)
-    clone = ' git clone git://github.com/clalancette/audrey.git -b config-server'
-    logging.info('running: %s' % clone)
-    exec_command(clone)
-    if os.path.exists(rpmbuild_dir):
-        logging.info('Removing existing rpmbuild dir that was detected...')
-        os.system('rm -rf rpmbuild_dir')
-    os.chdir(config_path)
-    mkrpms = 'rake rpm'
-    logging.info('running: %s' % mkrpms)
-    exec_command(mkrpms)
+        # Return a list of package paths (includes src.rpm)
+        packages_built = re.findall("^Wrote:\s*(.*\.rpm)$", build_log, re.MULTILINE)
+        if len(packages_built) == 0:
+            raise Exception("Failed to build packages, consult build log")
 
-#install audery from source
-def inst_frm_src_audry():
-    logging.info('Installing rpms from src')
-    os.chdir(rpmpath)
-    rpm_install = ' yum -y localinstall aeolus-config* --nogpgcheck'
-    logging.info('running: %s' % rpm_install)
-    exec_command(rpm_install)
+        return packages_built
+
+    def install_from_scm(self):
+        # FIXME - prepare custom f15 repo?
+
+        self._clone_from_scm()
+        self._install_buildreqs()
+        packages = self._make_rpms()
+
+        # Strip out any .src.rpm files
+        non_src_pkgs  = [p for p in packages if splitFilename(p)[4] != 'src']
+        yum_install(non_src_pkgs)
+
+        # FIXME - remove packages from file-system?
+
+class Conductor (AeolusModule):
+    name = 'aeolus-conductor'
+    git_url = 'git://git.fedorahosted.org/git/aeolus/conductor.git'
+    build_requires = 'classads-devel git rest-devel rpm-build ruby-devel zip'
+
+    #def install(self):
+    #    '''install package via RPM'''
+    #    call('yum -y install aeolus-all')
+
+class Configure (AeolusModule):
+    name = 'aeolus-configure'
+    git_url = 'git://git.fedorahosted.org/git/aeolus/configure.git'
+
+    def uninstall(self):
+        cmd = '/usr/sbin/aeolus-cleanup'
+        logging.info("Running '%s'" % cmd)
+        if os.path.isfile(cmd):
+            (rc, out) = call(cmd + ' -v')
+
+        # Call parent to remove package
+        AeolusModule.uninstall(self)
+
+    def setup(self):
+        '''Run custom configuration after install'''
+        cmd = 'aeolus-configure'
+        (rc, out) = call(cmd)
+
+class Oz (AeolusModule):
+    git_url = 'git://github.com/clalancette/oz.git'
+    build_requires = 'gcc git make rpm-build'
+    package_cmd = 'make rpm'
+
+class ImageFactory (AeolusModule):
+    git_url = 'git://github.com/aeolusproject/imagefactory.git'
+    build_requires = 'gcc git make rpm-build'
+    package_cmd = 'make rpm'
+
+class Iwhd (AeolusModule):
+    git_url = 'git://git.fedorahosted.org/iwhd.git'
+    #build_requires = 'jansson-devel libmicrohttpd-devel hail-devel gc-devel ' \
+    #    + 'git gperf mongodb-devel help2man mongodb-server libcurl-devel ' \
+    #    + 'libuuid-devel'
+    package_cmd = './bootstrap && ./configure && make && make rpm'
+
+class Audrey (AeolusModule):
+    git_url = 'git://github.com/clalancette/audrey.git -b config-server'
+    package_cmd = 'cd audrey/configserver && rake rpm'
+
+class Libdeltacloud (AeolusModule):
+    git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
+    package_cmd = './autogen.sh && ./configure && make rpm'
+
+# Qpid not required, since already packaged in Fedora
+# FIXME - not pulled from GIT, uses existing package
+class Qpid (AeolusModule):
+    build_requires = 'boost-devel e2fsprogs-devel pkgconfig gcc-c++ ' \
+        + 'make autoconf automake ruby libtool help2man doxygen graphviz ' \
+        + 'corosynclib-devel clusterlib-devel cyrus-sasl-devel ' \
+        + 'nss-devel nspr-devel xqilla-devel xerces-c-devel ' \
+        + 'ruby ruby-devel swig libibverbs-devel librdmacm-devel ' \
+        + 'libaio-devel'
+
+# FIXME - incomplete
+class Condor (AeolusModule):
+    git_url = 'http://git.condorproject.org/repos/condor.git -b V7_6-branch'
+    build_requires = 'coredumper coredumper-devel git qpid-cpp-server-devel ' \
+        + 'wget'
+    package_cmd = ['curl https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh',
+                   'PATH_TO_CONDOR=FIXME make_condor_package_7.x.sh 0dcloud',]
+
+def yum_install_if_needed(packages):
+
+    # convert to a string
+    if isinstance(packages, list):
+        packages = ' '.join(packages)
+
+    # Using shlex.split allows for package deps with spaces
+    missing_pkgs = list()
+    for pkg in shlex.split(packages):
+        (rc, out) = call('rpm -q %s' % pkg, raiseExc=False)
+        if rc != 0:
+            missing_pkgs.append(pkg)
+
+    yum_install(' '.join(missing_pkgs))
+
+def yum_install(packages, gpgcheck=False):
+    # convert to a string
+    if isinstance(packages, list):
+        packages = ' '.join(packages)
+
+    if len(packages) > 0:
+        yum_opts = gpgcheck and ' ' or '--nogpgcheck'
+        call('yum install %s -y "%s"' % (yum_opts, packages))
+
+        # Convert any packages to nvr (not file path)
+        package_nvrs = [p for p in shlex.split(packages) if not
+            os.path.isfile(p)]
+        package_nvrs += [str2NVR(p) for p in shlex.split(packages) if
+            os.path.isfile(p)]
+
+        (rc, out) = call('rpm --quiet -q %s' % ' '.join(package_nvrs))
+        if rc != 0:
+            raise Exception("Some build dependencies could not be installed")
+
+def str2NVR(s):
+    '''Convenience method to convert an rpm filename to just NVR'''
+    (n,v,r,e,a) = splitFilename(os.path.basename(s))
+    return '%s-%s-%s' % (n,v,r)
+
+def makedirs(path):
+    try:
+        os.makedirs(path)
+    except OSError, e:
+        if e.errno == errno.EEXIST:
+            pass
+
+def call(cmd, raiseExc=True):
+    logging.debug(cmd)
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+    (pout, perr) = p.communicate()
+    logging.debug("rc: %s" %  p.returncode)
+    logging.debug("output: %s" %  pout)
+    if p.returncode != 0 and raiseExc:
+        raise Exception("Command failed, rc=%s\n%s" % (p.returncode, pout))
+    return (p.returncode, pout)
+
+def add_custom_repos(repofiles):
+    if isinstance(repofiles, str):
+        repofiles = [repofiles]
+    for repofile in repofiles:
+        cmd = "curl -o /etc/yum.repos.d/%s %s" % (os.path.basename(repofile),
+            repofile)
+        print("Adding repo %s " % repofile)
+        (rc, out) = call(cmd)
