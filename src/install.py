@@ -179,8 +179,8 @@ if __name__ == "__main__":
 
     # Enable and start aeolus services
     configure.setup()
-    conductor.enable()
-    conductor.restart()
+    conductor.chkconfig('on')
+    conductor.svc_restart()
 
     # FIXME - are we looking for a specific result/output from
     # aeolus-check-services?
