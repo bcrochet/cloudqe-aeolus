@@ -7,10 +7,10 @@
 $ python src/install.py --help
 
 # Install from repo
-$ python src/install.py --source yum
+$ python src/install.py --source-yum
 
 # Install from src:
-$ python src/install.py --source git --base_dir '/home'
+$ python src/install.py --source=git --base_dir '/home'
 
 # Update a specific component
-$ python src/install.py --source git --base_dir '/home/xyz' factory
+$ python src/install.py --source=git --base_dir '/home/xyz' imagefactory
