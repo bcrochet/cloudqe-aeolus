@@ -112,27 +112,32 @@ class AeolusModule(object):
 
     def is_installed(self):
         '''install package via RPM'''
+        logging.info("Checking if %s is installed" % self.name)
         (rc, out) = call('rpm --quiet -q %s' % self.name, raiseExc=False)
         return rc == 0  # 0=pass
 
     def uninstall(self):
         '''uninstall rpm package'''
+        logging.info("Uninstalling %s using yum" % self.name)
         (rc, out) = call('yum -y remove %s' % self.name)
         return rc == 0  # 0=pass
 
     def install(self):
         '''install package via RPM'''
+        logging.info("Installing %s using yum" % self.name)
         call('yum -y install %s' % self.name)
 
     def chkconfig(self, cmd, serviceName=None):
         '''Unsing chkconfig, enable the service on boot'''
+        logging.info("Enabling system service %s" % serviceName or self.name)
         if cmd.lower() not in ['on', 'off']:
             raise Exception("Unknown chkconfig command: %s" % cmd)
         call('chkconfig %s %s' % (serviceName or self.name, cmd))
 
-    def _svc_cmd(self, service, serviceName=None):
+    def _svc_cmd(self, target, serviceName=None):
         '''Using servic, start the service'''
-        call('service %s %s' % (serviceName or self.name, service))
+        logging.info("Changing service state: %s -> %s" % (serviceName or self.name, target))
+        call('service %s %s' % (serviceName or self.name, target))
 
     def svc_start(self, serviceName=None):
         self._svc_cmd('start', serviceName)
@@ -145,10 +150,9 @@ class AeolusModule(object):
 
     def _clone_from_scm(self):
         '''checkout package from version control'''
-        logging.info("Checking out '%s' from SCM" % self.name)
-
         if not hasattr(self, 'git_url') or self.git_url is None:
             raise Exception("Module has no self.git_url defined")
+        logging.info("Checking out '%s' from %s" % (self.name, self.git_Url))
 
         cwd = os.getcwd()
         try:
@@ -162,7 +166,7 @@ class AeolusModule(object):
 
     def _make_rpms(self):
         '''Runs self.package_cmd and returns a list of built packages'''
-        logging.info("Building RPMs of '%s' from SCM" % self.name)
+        logging.info("Building %s RPM packages" % self.name)
 
         cwd = os.getcwd()
         build_log = ''
@@ -189,7 +193,7 @@ class AeolusModule(object):
 
         # Strip out any .src.rpm files
         non_src_pkgs  = [p for p in packages if splitFilename(p)[4] != 'src']
-        logging.info("Installing SCM-built packages for '%s' " % self.name)
+        logging.info("Installing SCM-built packages for '%s'" % self.name)
         yum_install(non_src_pkgs)
 
         # FIXME - remove packages from file-system?
@@ -218,6 +222,7 @@ class Configure (AeolusModule):
 
     def setup(self):
         '''Run custom configuration after install'''
+        logging.info("Running aeolus-configure")
         cmd = 'aeolus-configure'
         (rc, out) = call(cmd)
 
@@ -327,5 +332,5 @@ def add_custom_repos(repofiles):
     for repofile in repofiles:
         cmd = "curl -o /etc/yum.repos.d/%s %s" % (os.path.basename(repofile),
             repofile)
-        print("Adding repo %s " % repofile)
+        logging.info("Adding repo %s " % repofile)
         (rc, out) = call(cmd)
