@@ -152,7 +152,7 @@ class AeolusModule(object):
         '''checkout package from version control'''
         if not hasattr(self, 'git_url') or self.git_url is None:
             raise Exception("Module has no self.git_url defined")
-        logging.info("Checking out '%s' from %s" % (self.name, self.git_Url))
+        logging.info("Checking out '%s' from %s" % (self.name, self.git_url))
 
         cwd = os.getcwd()
         try:
