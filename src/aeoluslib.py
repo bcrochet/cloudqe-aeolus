@@ -137,15 +137,19 @@ class AeolusModule(object):
 
     def chkconfig(self, cmd, serviceName=None):
         '''Unsing chkconfig, enable the service on boot'''
-        logging.info("Enabling system service %s" % serviceName or self.name)
+        if serviceName is None:
+            serviceName = self.name
+        logging.info("Enabling system service %s" % serviceName)
         if cmd.lower() not in ['on', 'off']:
             raise Exception("Unknown chkconfig command: %s" % cmd)
-        call('chkconfig %s %s' % (serviceName or self.name, cmd))
+        call('chkconfig %s %s' % (serviceName, cmd))
 
     def _svc_cmd(self, target, serviceName=None):
         '''Using servic, start the service'''
-        logging.info("Changing service state: %s -> %s" % (serviceName or self.name, target))
-        call('service %s %s' % (serviceName or self.name, target))
+        if serviceName is None:
+            serviceName = self.name
+        logging.info("Changing service state: %s -> %s" % (serviceName, target))
+        call('service %s %s' % (serviceName, target))
 
     def svc_start(self, serviceName=None):
         self._svc_cmd('start', serviceName)
