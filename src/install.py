@@ -143,7 +143,7 @@ def is_requested(comp, requested):
 if __name__ == "__main__":
 
     # Process arguments
-    (opts, components) = parse_args()
+    (opts, requested_modules) = parse_args()
 
     # Setup logging
     setup_logging(opts.debug, opts.logfile)
@@ -172,9 +172,9 @@ if __name__ == "__main__":
     aeoluslib.yum_install('aeolus-all')
 
     # Install aeolus-conductor from git
-    if opts.source == 'git' and is_requested('conductor', components):
+    if opts.source == 'git' and is_requested('conductor', requested_modules):
         conductor.install_from_scm()
-    if opts.source == 'git' and is_requested('configure', components):
+    if opts.source == 'git' and is_requested('configure', requested_modules):
         configure.install_from_scm()
 
     # Enable and start aeolus services
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     aeoluslib.call('/usr/bin/aeolus-check-services')
 
     for request in ['oz', 'imagefactory', 'iwhd', 'audrey']:
-        if is_requested(request, components):
+        if is_requested(request, requested_modules):
             cls_name = request.capitalize()
             if not hasattr(aeoluslib, cls_name):
                 logging.error("Unable to find aeoluslib.%s" % cls_name)
@@ -197,6 +197,7 @@ if __name__ == "__main__":
             cls_inst = cls_obj()
 
             if opts.source == 'yum':
+                # NOTE - won't this already be installed by 'aeolus-all' above?
                 cls_inst.install()
             elif opts.source == 'git':
                 cls_inst.install_from_scm()
