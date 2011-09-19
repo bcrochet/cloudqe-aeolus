@@ -84,6 +84,7 @@ class AeolusModule(object):
                 print e
 
     def _install_buildreqs(self):
+        logging.info("Building '%s' from SCM" % self.name)
 
         if self.build_requires is None or \
            self.build_requires == '':
@@ -142,10 +143,10 @@ class AeolusModule(object):
     def svc_stop(self, serviceName=None):
         self._svc_cmd('stop', serviceName)
 
-    logging.info('Restarting Imagefactory  service...')
-    chk_status = '/etc/init.d/imagefactory  restart'
     def _clone_from_scm(self):
         '''checkout package from version control'''
+        logging.info("Checking out '%s' from SCM" % self.name)
+
         if not hasattr(self, 'git_url') or self.git_url is None:
             raise Exception("Module has no self.git_url defined")
 
@@ -161,6 +162,8 @@ class AeolusModule(object):
 
     def _make_rpms(self):
         '''Runs self.package_cmd and returns a list of built packages'''
+        logging.info("Building RPMs of '%s' from SCM" % self.name)
+
         cwd = os.getcwd()
         build_log = ''
         try:
@@ -180,13 +183,13 @@ class AeolusModule(object):
 
     def install_from_scm(self):
         # FIXME - prepare custom f15 repo?
-
         self._clone_from_scm()
         self._install_buildreqs()
         packages = self._make_rpms()
 
         # Strip out any .src.rpm files
         non_src_pkgs  = [p for p in packages if splitFilename(p)[4] != 'src']
+        logging.info("Installing SCM-built packages for '%s' " % self.name)
         yum_install(non_src_pkgs)
 
         # FIXME - remove packages from file-system?
@@ -223,7 +226,7 @@ class Oz (AeolusModule):
     build_requires = 'gcc git make rpm-build'
     package_cmd = 'make rpm'
 
-class ImageFactory (AeolusModule):
+class Imagefactory (AeolusModule):
     git_url = 'git://github.com/aeolusproject/imagefactory.git'
     build_requires = 'gcc git make rpm-build'
     package_cmd = 'make rpm'
