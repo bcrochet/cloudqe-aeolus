@@ -272,7 +272,7 @@ class Iwhd (AeolusModule):
 
 class Audrey (AeolusModule):
     git_url = 'git://github.com/clalancette/audrey.git -b config-server'
-    package_cmd = 'cd audrey/configserver && rake rpm'
+    package_cmd = 'cd configserver && rake rpm'
 
 class Libdeltacloud (AeolusModule):
     git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
