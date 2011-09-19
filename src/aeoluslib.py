@@ -31,6 +31,7 @@ import tempfile
 import shlex
 from rpmUtils.miscutils import splitFilename
 
+# Module-wide support for specifying a working directory
 workdir = None
 
 def prepare_system(repofiles=[]):
@@ -63,17 +64,18 @@ class AeolusModule(object):
             self.workdir = os.path.join(kwargs.get('workdir'), self.name)
             makedirs(self.workdir)
         elif workdir is not None:
-            self.workdir = workdir
+            self.workdir = os.path.join(workdir, self.name)
             makedirs(self.workdir)
         else:
             self.workdir = tempfile.mkdtemp(suffix='.%s' % self.name)
 
     def setup(self):
-        raise NotImplemented("Not implemented by derived object")
+        raise NotImplementedError("Not implemented by derived object")
 
     # NOTE: Isn't always called when object is removed (search interwebs for reasons)
     def __del__(self):
-        self._cleanup()
+        '''perform any cleanup'''
+        #self._cleanup()
 
     def _cleanup(self):
         '''Remove self.workdir'''
@@ -84,8 +86,6 @@ class AeolusModule(object):
                 print e
 
     def _install_buildreqs(self):
-        logging.info("Building '%s' from SCM" % self.name)
-
         if self.build_requires is None or \
            self.build_requires == '':
             logging.debug("No build requires provided, detecting...")
@@ -107,6 +107,8 @@ class AeolusModule(object):
             else:
                 logging.warn("Unable to detect buildrequires for '%s'" % \
                     self.name)
+
+        logging.info("Installing BuildRequires for %s: %s" % (self.name, self.build_requires))
 
         yum_install_if_needed(self.build_requires)
 
@@ -152,12 +154,20 @@ class AeolusModule(object):
         '''checkout package from version control'''
         if not hasattr(self, 'git_url') or self.git_url is None:
             raise Exception("Module has no self.git_url defined")
-        logging.info("Checking out '%s' from %s" % (self.name, self.git_url))
 
         cwd = os.getcwd()
         try:
-            os.chdir(self.workdir)
-            (rc, clone_log) = call('git clone %s %s' % (self.git_url, self.workdir))
+            # Already cloned?
+            if os.path.isdir(os.path.join(self.workdir, '.git')):
+                os.chdir(self.workdir)
+                logging.info("Updating existing %s checkout at %s" % \
+                    (self.name, self.workdir))
+                (rc, pull_log) = call('git pull')
+            else:
+                logging.info("Checking out %s from %s into %s" % (self.name, \
+                    self.git_url, self.workdir))
+                (rc, clone_log) = call('git clone %s %s' % (self.git_url, \
+                    self.workdir))
         finally:
             # return to old directory
             if os.getcwd() != cwd:
@@ -183,6 +193,9 @@ class AeolusModule(object):
         if len(packages_built) == 0:
             raise Exception("Failed to build packages, consult build log")
 
+        for pkg in packages_built:
+            logging.info("... %s" % pkg)
+
         return packages_built
 
     def install_from_scm(self):
@@ -194,18 +207,26 @@ class AeolusModule(object):
         # Strip out any .src.rpm files
         non_src_pkgs  = [p for p in packages if splitFilename(p)[4] != 'src']
         logging.info("Installing SCM-built packages for '%s'" % self.name)
+        for pkg in non_src_pkgs:
+            logging.info("... %s" % pkg)
         yum_install(non_src_pkgs)
-
         # FIXME - remove packages from file-system?
 
 class Conductor (AeolusModule):
     name = 'aeolus-conductor'
     git_url = 'git://git.fedorahosted.org/git/aeolus/conductor.git'
-    build_requires = 'classads-devel git rest-devel rpm-build ruby-devel zip'
+    build_requires = 'condor-classads-devel git rest-devel rpm-build ruby-devel zip'
 
     #def install(self):
     #    '''install package via RPM'''
     #    call('yum -y install aeolus-all')
+
+    def setup(self):
+        '''Run custom configuration after install'''
+        # FIXME - are we looking for a specific result/output from
+        logging.info("Running aeolus-check-services")
+        cmd = '/usr/bin/aeolus-check-services'
+        (rc, out) = call(cmd)
 
 class Configure (AeolusModule):
     name = 'aeolus-configure'
@@ -271,35 +292,38 @@ class Condor (AeolusModule):
 
 def yum_install_if_needed(packages):
 
-    # convert to a string
-    if isinstance(packages, list):
-        packages = ' '.join(packages)
+    # convert to a list
+    if isinstance(packages, str):
+        packages = shlex.split(packages)
 
     # Using shlex.split allows for package deps with spaces
     missing_pkgs = list()
-    for pkg in shlex.split(packages):
+    for pkg in packages:
         (rc, out) = call('rpm -q %s' % pkg, raiseExc=False)
         if rc != 0:
             missing_pkgs.append(pkg)
 
-    yum_install(' '.join(missing_pkgs))
+    yum_install(missing_pkgs)
 
 def yum_install(packages, gpgcheck=False):
-    # convert to a string
-    if isinstance(packages, list):
-        packages = ' '.join(packages)
+
+    # convert to a list
+    if isinstance(packages, str):
+        packages = shlex.split(packages)
 
     if len(packages) > 0:
         yum_opts = gpgcheck and ' ' or '--nogpgcheck'
-        call('yum install %s -y "%s"' % (yum_opts, packages))
+        call('yum install %s -y %s' % (yum_opts, ' '.join(packages)))
 
         # Convert any packages to nvr (not file path)
-        package_nvrs = [p for p in shlex.split(packages) if not
+        package_nvrs = [p for p in packages if not
             os.path.isfile(p)]
-        package_nvrs += [str2NVR(p) for p in shlex.split(packages) if
+        package_nvrs += [str2NVR(p) for p in packages if
             os.path.isfile(p)]
 
-        (rc, out) = call('rpm --quiet -q %s' % ' '.join(package_nvrs))
+        # Yum doesn't tell us whether things installed or not ... ask rpm
+        (rc, out) = call('rpm --quiet -q %s' % ' '.join(package_nvrs),
+            raiseExc=False)
         if rc != 0:
             raise Exception("Some build dependencies could not be installed")
 

@@ -110,7 +110,9 @@ def setup_logging(debug=False, logfile=None):
         logging_format = '%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s'
         logging_level = logging.DEBUG
     else:
-        logging_format = '%(asctime)s %(levelname)s %(message)s'
+        #logging_format = '%(asctime)s %(levelname)s %(message)s'
+        #logging_format = '(%(levelname)s) %(message)s'
+        logging_format = '%(message)s'
         logging_level = logging.INFO
 
     # Configure root logger
@@ -158,35 +160,32 @@ if __name__ == "__main__":
     if opts.source == 'git':
         aeoluslib.workdir = opts.base_dir
 
-    # Cleanup any stale existing configuration
-    conductor = aeoluslib.Conductor()
-    if conductor.is_installed():
-        conductor.uninstall()
+    if False:
+        # Cleanup any stale existing configuration
+        conductor = aeoluslib.Conductor()
+        if conductor.is_installed():
+            conductor.uninstall()
 
-    # If configure is already installed, clean it up
-    configure = aeoluslib.Configure()
-    if configure.is_installed():
-        configure.uninstall()
+        # If configure is already installed, clean it up
+        configure = aeoluslib.Configure()
+        if configure.is_installed():
+            configure.uninstall()
 
-    # Install fresh out of the oven
-    aeoluslib.yum_install('aeolus-all')
+        # Install fresh out of the oven
+        aeoluslib.yum_install('aeolus-all')
 
-    # Install aeolus-conductor from git
-    if opts.source == 'git' and is_requested('conductor', requested_modules):
-        conductor.install_from_scm()
-    if opts.source == 'git' and is_requested('configure', requested_modules):
-        configure.install_from_scm()
+        # Install aeolus-conductor from git
+        if opts.source == 'git' and is_requested('conductor', requested_modules):
+            conductor.install_from_scm()
+        if opts.source == 'git' and is_requested('configure', requested_modules):
+            configure.install_from_scm()
 
-    # Enable and start aeolus services
-    configure.setup()
-    conductor.chkconfig('on')
-    conductor.svc_restart()
+        # Enable and start aeolus services
+        configure.setup()
+        conductor.chkconfig('on')
+        conductor.svc_restart()
 
-    # FIXME - are we looking for a specific result/output from
-    # aeolus-check-services?
-    aeoluslib.call('/usr/bin/aeolus-check-services')
-
-    for request in ['oz', 'imagefactory', 'iwhd', 'audrey']:
+    for request in ['conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey']:
         if is_requested(request, requested_modules):
             cls_name = request.capitalize()
             if not hasattr(aeoluslib, cls_name):
@@ -196,11 +195,19 @@ if __name__ == "__main__":
             cls_obj = getattr(aeoluslib, cls_name)
             cls_inst = cls_obj()
 
+            # Install the module
             if opts.source == 'yum':
-                # NOTE - won't this already be installed by 'aeolus-all' above?
                 cls_inst.install()
             elif opts.source == 'git':
                 cls_inst.install_from_scm()
 
-            # FIXME - enable imagefactory service
-            # FIXME - enable iwhd service
+            # Activate and start the system service (if applicable)
+            if request in ['conductor', 'imagefactory', 'iwhd']:
+                cls_inst.chkconfig('on')
+                cls_inst.svc_restart()
+
+            # Run any custom setup
+            try:
+                cls_inst.setup()
+            except NotImplementedError:
+                pass
