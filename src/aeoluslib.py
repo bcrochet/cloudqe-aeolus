@@ -34,6 +34,11 @@ from rpmUtils.miscutils import splitFilename
 # Module-wide support for specifying a working directory
 workdir = None
 
+# Module-wide support to handle cleanup procedures.  When cleanup=True, after #
+# completion, aeoluslib will remove any git repos and packages.  Caller is
+# responsible for removing any repofiles created
+cleanup = True
+
 def prepare_system(repofiles=[]):
     if isinstance(repofiles, str):
         repofiles = [repofiles]
@@ -74,8 +79,9 @@ class AeolusModule(object):
 
     # NOTE: Isn't always called when object is removed (search interwebs for reasons)
     def __del__(self):
-        '''perform any cleanup'''
-        #self._cleanup()
+        '''perform cleanup if desired (default)'''
+        if cleanup:
+            self._cleanup()
 
     def _cleanup(self):
         '''Remove self.workdir'''
@@ -358,3 +364,16 @@ def add_custom_repos(repofiles):
             repofile)
         logging.info("Adding repo %s " % repofile)
         (rc, out) = call(cmd)
+
+def remove_custom_repos(repofiles):
+    '''Remove any repofiles provided (if aeoluslib.cleanup = True (default)'''
+    if not cleanup:
+        return
+
+    if isinstance(repofiles, str):
+        repofiles = [repofiles]
+    for repofile in repofiles:
+        repofile = os.path.join('/etc/yum.repos.d', os.path.basename(repofile))
+        if os.path.isfile(repofile):
+            logging.info("Removing file %s " % repofile)
+            os.remove(repofile)

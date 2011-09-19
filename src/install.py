@@ -76,6 +76,8 @@ Examples:
         default=None, help="providing a base dir for installation")
     parser.add_option("--log", action="store", dest="logfile",
         default=None, help="Log output to a file")
+    parser.add_option("--noclean", action="store_true", dest="noclean",
+        default=False, help="Don't cleanup after completion",)
     parser.add_option("-d", "--debug", action="store_true", dest="debug",
         default=False, help="Enable debug output",)
 
@@ -88,8 +90,7 @@ Examples:
 
     # Sanity --base_dir
     if opts.source == 'git':
-        if opts.base_dir is None:
-            parser.error("Must provide --base_dir when using --source=git")
+        '''FIXME - optionally sanitize opts.base_dir'''
 
     elif opts.source == 'yum':
         '''FIXME - optionally sanitize opts.repofile'''
@@ -137,30 +138,30 @@ def setup_logging(debug=False, logfile=None):
                                  logger.handlers[0].formatter.datefmt))
         logger.addHandler(filehandler)
 
-def is_requested(comp, requested):
-    if comp in requested or 'all' in requested:
+def is_requested(module, requested):
+    if module in requested or 'all' in requested:
         return True
     return False
 
-if __name__ == "__main__":
-
-    # Process arguments
-    (opts, requested_modules) = parse_args()
-
-    # Setup logging
-    setup_logging(opts.debug, opts.logfile)
-
+def aeolus_install(opts, requested_modules):
     # FIXME - detect whether running in SELinux enforcing
     # FIXME - remind about firewall changes?
 
+    # If directed, enable custom repofiles
     if opts.repofile:
-        aeoluslib.add_custom_repo(opts.repofile)
+        aeoluslib.add_custom_repos(opts.repofile)
+
+    # Instruct aeoluslib to not cleanup temporary files after completion
+    if opts.noclean:
+        aeoluslib.cleanup = False
 
     # Define a base_dir for all git operations
-    if opts.source == 'git':
+    if opts.source == 'git' and opts.base_dir:
         aeoluslib.workdir = opts.base_dir
 
     if False:
+        '''I think this doesn't make sense ... and can go away in favor of the
+        loop below'''
         # Cleanup any stale existing configuration
         conductor = aeoluslib.Conductor()
         if conductor.is_installed():
@@ -185,9 +186,10 @@ if __name__ == "__main__":
         conductor.chkconfig('on')
         conductor.svc_restart()
 
-    for request in ['conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey']:
-        if is_requested(request, requested_modules):
-            cls_name = request.capitalize()
+    # Install requested modules
+    for module in ['conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey']:
+        if is_requested(module, requested_modules):
+            cls_name = module.capitalize()
             if not hasattr(aeoluslib, cls_name):
                 logging.error("Unable to find aeoluslib.%s" % cls_name)
                 sys.exit(1)
@@ -202,12 +204,28 @@ if __name__ == "__main__":
                 cls_inst.install_from_scm()
 
             # Activate and start the system service (if applicable)
-            if request in ['conductor', 'imagefactory', 'iwhd']:
+            if module in ['conductor', 'imagefactory', 'iwhd']:
                 cls_inst.chkconfig('on')
                 cls_inst.svc_restart()
 
-            # Run any custom setup
+            # Run custom setup
             try:
                 cls_inst.setup()
             except NotImplementedError:
                 pass
+
+if __name__ == "__main__":
+
+    # Process arguments
+    (opts, requested_modules) = parse_args()
+
+    # Setup logging
+    setup_logging(opts.debug, opts.logfile)
+
+    try:
+        aeolus_install(opts, requested_modules)
+    except KeyError:
+        print "Exiting upon user request"
+        sys.exit(1)
+    finally:
+        aeoluslib.remove_custom_repos(opts.repofile)
