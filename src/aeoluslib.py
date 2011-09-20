@@ -315,6 +315,14 @@ class Pythonrhsm (AeolusModule):
     build_requires = 'python-devel python-setuptools'
     package_cmd = 'cd client/python-rhsm && tito build --rpm --test'
 
+class Matahari (AeolusModule):
+    git_url = 'git://github.com/matahari/matahari.git'
+    build_requires = 'cmake libuuid-devel gcc-c++ pcre-devel glib2-devel ' \
+        + 'sigar-devel libcurl-devel cxxtest help2man ' \
+        + 'qpid-cpp-client-devel qmf-devel dbus-devel dbus-glib-devel ' \
+        + 'polkit-devel'
+    package_cmd = 'make rpms'
+
 def yum_install_if_needed(packages):
 
     # convert to a list
