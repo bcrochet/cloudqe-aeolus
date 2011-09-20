@@ -64,7 +64,7 @@ class AeolusModule(object):
             self.workdir = tempfile.mkdtemp(suffix='.%s' % self.name)
 
     def setup(self):
-        raise NotImplementedError("Not implemented by derived object")
+        raise NotImplementedError("Not implemented by derived class")
 
     # NOTE: Isn't always called when object is removed (search interwebs for reasons)
     def __del__(self):
@@ -288,6 +288,26 @@ class Condor (AeolusModule):
         + 'wget'
     package_cmd = ['curl https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh',
                    'PATH_TO_CONDOR=FIXME make_condor_package_7.x.sh 0dcloud',]
+
+class Katello (AeolusModule):
+    git_url = 'git://git.fedorahosted.org/git/katello.git'
+    # FIXME - add support for handling provides: rubygem(compass) >= 0.11.5
+    build_requires = 'tito coreutils findutils sed rubygems rubygem-rake ' \
+        + 'rubygem-gettext rubygem-jammit rubygem-compass ' \
+        + 'rubygem-compass-960-plugin'
+    package_cmd = 'cd src && tito build --rpm --test'
+
+class Pulp (AeolusModule):
+    git_url = 'git://git.fedorahosted.org/pulp.git'
+    build_requires = 'python-devel python-setuptools python-nose ' \
+        + 'rpm-python make checkpolicy selinux-policy hardlink '
+    package_cmd = 'tito build --rpm --test'
+
+class Candlepin (AeolusModule):
+    git_url = 'git://git.fedorahosted.org/candlepin.git'
+    build_requires = 'ruby rubygems ruby-devel gcc perl-Locale-Msgfmt ' \
+        + 'tomcat6 java-1.6.0-openjdk-devel tito'
+    package_cmd = 'tito build --rpm --test'
 
 def yum_install_if_needed(packages):
 
