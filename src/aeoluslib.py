@@ -39,17 +39,6 @@ workdir = None
 # responsible for removing any repofiles created
 cleanup = True
 
-def prepare_system(repofiles=[]):
-    if isinstance(repofiles, str):
-        repofiles = [repofiles]
-    for repofile in repofiles:
-        cmd = "curl -o /etc/yum.repos.d/%s %s" % (os.path.basename(repofile),
-            repofile)
-        (rc, out) = call(cmd)
-
-    # Install basic packages
-    call('yum install -y classads-devel git rest-devel rpm-build ruby-devel zip')
-
 class AeolusModule(object):
     # Module name (defaults to __class__.__name__.lower())
     name = None
@@ -361,6 +350,8 @@ def call(cmd, raiseExc=True):
     return (p.returncode, pout)
 
 def add_custom_repos(repofiles):
+    '''Download the provided list of yum repository files to
+    /etc/yum.repos.d/'''
     if isinstance(repofiles, str):
         repofiles = [repofiles]
     for repofile in repofiles:
@@ -370,7 +361,8 @@ def add_custom_repos(repofiles):
         (rc, out) = call(cmd)
 
 def remove_custom_repos(repofiles):
-    '''Remove any repofiles provided (if aeoluslib.cleanup = True (default)'''
+    '''Remove provided repofiles provided (if aeoluslib.cleanup = True
+    (default)'''
     if not cleanup:
         return
 
