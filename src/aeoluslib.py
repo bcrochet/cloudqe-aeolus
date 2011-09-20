@@ -321,7 +321,7 @@ class Matahari (AeolusModule):
         + 'sigar-devel libcurl-devel cxxtest help2man ' \
         + 'qpid-cpp-client-devel qpid-qmf-devel dbus-devel dbus-glib-devel ' \
         + 'polkit-devel'
-    package_cmd = 'make rpms'
+    package_cmd = 'make rpm'
 
 def yum_install_if_needed(packages):
 
