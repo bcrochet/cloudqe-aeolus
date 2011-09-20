@@ -306,8 +306,14 @@ class Pulp (AeolusModule):
 class Candlepin (AeolusModule):
     git_url = 'git://git.fedorahosted.org/candlepin.git'
     build_requires = 'ruby rubygems ruby-devel gcc perl-Locale-Msgfmt ' \
-        + 'tomcat6 java-1.6.0-openjdk-devel tito'
-    package_cmd = 'tito build --rpm --test'
+        + 'tomcat6 java-1.6.0-openjdk-devel tito java ant gettext'
+    package_cmd = 'cd proxy && tito build --rpm --test'
+
+class Pythonrhsm (AeolusModule):
+    name = 'python-rhsm'
+    git_url = 'git://git.fedorahosted.org/candlepin.git'
+    build_requires = 'python-devel python-setuptools'
+    package_cmd = 'cd client/python-rhsm && tito build --rpm --test'
 
 def yum_install_if_needed(packages):
 
