@@ -319,7 +319,7 @@ class Matahari (AeolusModule):
     git_url = 'git://github.com/matahari/matahari.git'
     build_requires = 'cmake libuuid-devel gcc-c++ pcre-devel glib2-devel ' \
         + 'sigar-devel libcurl-devel cxxtest help2man ' \
-        + 'qpid-cpp-client-devel qmf-devel dbus-devel dbus-glib-devel ' \
+        + 'qpid-cpp-client-devel qpid-qmf-devel dbus-devel dbus-glib-devel ' \
         + 'polkit-devel'
     package_cmd = 'make rpms'
 
