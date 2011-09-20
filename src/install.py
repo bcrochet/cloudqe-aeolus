@@ -30,6 +30,7 @@ import sys
 import optparse
 import logging
 import yum
+import inspect
 
 try:
     import aeoluslib
@@ -49,18 +50,38 @@ def yum_var_subst(buf):
         buf = buf.replace('$'+varname, yb.yumvar[varname])
     return buf
 
+def get_supported_modules():
+    '''Discover supported AeolusModule subclasses'''
+    def is_aeolusmodule(object):
+        '''The built-in issubclass treats classes as subclasses of themselves.
+        This method does not.'''
+        if inspect.isclass(object) \
+           and issubclass(object, aeoluslib.AeolusModule) \
+           and aeoluslib.AeolusModule in object.__bases__:
+            return True
+        return False
+
+    return [mbr[0].lower() \
+        for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule)]
+
 def parse_args():
-    #parser = optparse.OptionParser()
-    component_list = ['all', 'conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey',]
-    usage_str = '''%%prog [options] <%s>
+    # Old method - Hard code the list of supported modules
+    # component_list = ['all', 'conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey',]
+    component_list = ['all']
+    component_list.extend(get_supported_modules())
+
+    usage_str = '''%%prog [options] [module(s)]
+
+Supported modules include:
+ %s
 
 Examples:
  * Install oz from git
    $ install.py --source=git --base_dir=/home oz
  * Install audrey using yum
-   $ install.py --source=yum=/home audrey
+   $ install.py --source=yum audrey
  * Install everything from git
-   $ install.py --source=git --base_dir=/home all''' % (','.join(component_list),)
+   $ install.py --source=git --base_dir=/home all''' % (', '.join(component_list),)
 
     parser = optparse.OptionParser(usage=usage_str)
     source_choices = ["yum", "git"]
@@ -117,11 +138,12 @@ def setup_logging(debug=False, logfile=None):
         logging_level = logging.INFO
 
     # Configure root logger
-    # FIXME - the following isn't properly setting level ... not sure why
     logging.basicConfig(level=logging_level,
                         format=logging_format,
                         datefmt='%Y-%d-%m %I:%M:%S')
 
+    # HACK - the above doesn't properly set the desired level, so the
+    # following fixes that
     logger = logging.getLogger()
     logger.setLevel(logging_level)
 
@@ -186,8 +208,13 @@ def aeolus_install(opts, requested_modules):
         conductor.chkconfig('on')
         conductor.svc_restart()
 
+    # Force specific module install/setup order
+    reordered_modlist = ['conductor', 'configure']
+    # Include everything else
+    reordered_modlist.extend(get_supported_modules())
+
     # Install requested modules
-    for module in ['conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey']:
+    for module in reordered_modlist:
         if is_requested(module, requested_modules):
             cls_name = module.capitalize()
             if not hasattr(aeoluslib, cls_name):
