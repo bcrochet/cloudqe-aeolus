@@ -92,20 +92,19 @@ class AeolusModule(object):
                                 if '.spec' in spec]
 
             # Gather any 'BuildRequires' from the spec files
-            build_requires = list()
+            detected_requires = list()
             for spec in specfiles:
-                build_requires += re.findall(r'^BuildRequires:\s*([^\n, ]*)',
+                detected_requires += re.findall(r'^BuildRequires:\s*([^\n, ]*)',
                     open(spec, 'r').read(), re.MULTILINE)
+            self.build_requires = ' '.join(detected_requires)
 
-            if len(build_requires) > 0:
-                self.build_requires = ' '.join(build_requires)
-            else:
-                logging.warn("Unable to detect buildrequires for '%s'" % \
-                    self.name)
-
-        logging.info("Installing BuildRequires for %s: %s" % (self.name, self.build_requires))
-
-        yum_install_if_needed(self.build_requires)
+        if self.build_requires is None or self.build_requires == '':
+            logging.warn("No BuildRequires detected for %s" % \
+                self.name)
+        else:
+            logging.info("Installing BuildRequires for %s: %s" % \
+                (self.name, self.build_requires))
+            yum_install_if_needed(self.build_requires)
 
     def is_installed(self):
         '''install package via RPM'''
