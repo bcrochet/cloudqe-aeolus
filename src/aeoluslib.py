@@ -229,7 +229,7 @@ class Conductor (AeolusModule):
 class Configure (AeolusModule):
     name = 'aeolus-configure'
     git_url = 'git://git.fedorahosted.org/git/aeolus/configure.git'
-    package_cmd = 'rake rpm'
+    package_cmd = 'rake rpms'
 
     def uninstall(self):
         cmd = '/usr/sbin/aeolus-cleanup'
