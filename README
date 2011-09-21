@@ -3,14 +3,17 @@
 # Install from the src
 # Update aeolus components
 
-# Usage:
-$ python src/install.py --help
+# Display usage information
+$ python aeolus-install --help
 
-# Install from repo
-$ python src/install.py --source-yum
+# Install oz from existing yum repositories
+$ python aeolus-install --source=yum oz
 
-# Install from src:
-$ python src/install.py --source=git --base_dir '/home'
+# Install audrey using yum, include provided repo during installation
+$ python aeolus-install --source=yum --repofile=file:///path/to/aeolus.repo audrey
 
-# Update a specific component
-$ python src/install.py --source=git --base_dir '/home/xyz' imagefactory
+# Build and install aeolus-conductor from git:
+$ python aeolus-install --source=git conductor
+
+# Build and install everything from git
+$ python aeolus-install --source=git all
