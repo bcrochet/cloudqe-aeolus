@@ -97,8 +97,10 @@ Examples:
         default=None, help="providing a base dir for installation")
     parser.add_option("--log", action="store", dest="logfile",
         default=None, help="Log output to a file")
-    parser.add_option("--noclean", action="store_true", dest="noclean",
+    parser.add_option("--no-clean", action="store_true", dest="no_clean",
         default=False, help="Don't cleanup after completion",)
+    parser.add_option("--build-only", action="store_true", dest="build_only",
+        default=False, help="Don't install packages, just build them",)
     parser.add_option("-d", "--debug", action="store_true", dest="debug",
         default=False, help="Enable debug output",)
 
@@ -174,39 +176,12 @@ def aeolus_install(opts, requested_modules):
         aeoluslib.add_custom_repos(opts.repofile)
 
     # Instruct aeoluslib to not cleanup temporary files after completion
-    if opts.noclean:
+    if opts.no_clean:
         aeoluslib.cleanup = False
 
     # Define a base_dir for all git operations
     if opts.source == 'git' and opts.base_dir:
         aeoluslib.workdir = opts.base_dir
-
-    if False:
-        '''I think this doesn't make sense ... and can go away in favor of the
-        loop below'''
-        # Cleanup any stale existing configuration
-        conductor = aeoluslib.Conductor()
-        if conductor.is_installed():
-            conductor.uninstall()
-
-        # If configure is already installed, clean it up
-        configure = aeoluslib.Configure()
-        if configure.is_installed():
-            configure.uninstall()
-
-        # Install fresh out of the oven
-        aeoluslib.yum_install('aeolus-all')
-
-        # Install aeolus-conductor from git
-        if opts.source == 'git' and is_requested('conductor', requested_modules):
-            conductor.install_from_scm()
-        if opts.source == 'git' and is_requested('configure', requested_modules):
-            configure.install_from_scm()
-
-        # Enable and start aeolus services
-        configure.setup()
-        conductor.chkconfig('on')
-        conductor.svc_restart()
 
     # Force specific module install/setup order
     reordered_modlist = ['conductor', 'configure']
@@ -228,18 +203,23 @@ def aeolus_install(opts, requested_modules):
             if opts.source == 'yum':
                 cls_inst.install()
             elif opts.source == 'git':
-                cls_inst.install_from_scm()
+                if opts.build_only:
+                    cls_inst.build_from_scm()
+                else:
+                    cls_inst.install_from_scm()
 
-            # Activate and start the system service (if applicable)
-            if module in ['conductor', 'imagefactory', 'iwhd']:
-                cls_inst.chkconfig('on')
-                cls_inst.svc_restart()
+            # If we installed the package, perform additional setup
+            if not opts.build_only:
+                # Activate and start the system service (if applicable)
+                if module in ['conductor', 'imagefactory', 'iwhd']:
+                    cls_inst.chkconfig('on')
+                    cls_inst.svc_restart()
 
-            # Run custom setup
-            try:
-                cls_inst.setup()
-            except NotImplementedError:
-                pass
+                # Run custom setup
+                try:
+                    cls_inst.setup()
+                except NotImplementedError:
+                    pass
 
 if __name__ == "__main__":
 

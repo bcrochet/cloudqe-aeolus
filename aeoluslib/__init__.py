@@ -196,14 +196,17 @@ class AeolusModule(object):
 
         return packages_built
 
-    def install_from_scm(self):
-        # FIXME - prepare custom f15 repo?
+    def build_from_scm(self):
         self._clone_from_scm()
         self._install_buildreqs()
-        packages = self._make_rpms()
+        return self._make_rpms()
+
+    def install_from_scm(self):
+        packages = self.build_from_scm()
 
         # Strip out any .src.rpm files
         non_src_pkgs  = [p for p in packages if splitFilename(p)[4] != 'src']
+
         logging.info("Installing SCM-built packages for '%s'" % self.name)
         for pkg in non_src_pkgs:
             logging.info("... %s" % pkg)
@@ -213,7 +216,7 @@ class AeolusModule(object):
 class Conductor (AeolusModule):
     name = 'aeolus-conductor'
     git_url = 'git://git.fedorahosted.org/git/aeolus/conductor.git'
-    build_requires = 'condor-classads-devel git rest-devel rpm-build ruby-devel zip'
+    build_requires = 'condor-classads-devel git rest-devel rpm-build ruby-devel zip rubygem-sass'
 
     #def install(self):
     #    '''install package via RPM'''
@@ -264,8 +267,12 @@ class Iwhd (AeolusModule):
     package_cmd = './bootstrap && ./configure && make && make rpm'
 
 class Audrey (AeolusModule):
-    git_url = 'git://github.com/clalancette/audrey.git -b config-server'
-    package_cmd = 'cd configserver && rake rpm'
+    name = 'aeolus-configserver'
+    #git_url = 'git://github.com/clalancette/audrey.git -b config-server'
+    git_url = 'git://github.com/clalancette/audrey.git'
+    package_cmd = 'cd configserver && rake rpm && cd .. && ' \
+                + 'cd audrey_puppet && make rpms && cd .. && ' \
+                + 'cd audrey_start && make rpms'
 
 class Libdeltacloud (AeolusModule):
     git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
@@ -285,9 +292,11 @@ class Qpid (AeolusModule):
 class Condor (AeolusModule):
     git_url = 'http://git.condorproject.org/repos/condor.git -b V7_6-branch'
     build_requires = 'coredumper coredumper-devel git qpid-cpp-server-devel ' \
-        + 'wget'
-    package_cmd = ['curl https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh',
-                   'PATH_TO_CONDOR=FIXME make_condor_package_7.x.sh 0dcloud',]
+        + 'wget imake flex byacc pcre-devel postgresql-devel openssl-devel ' \
+        + 'krb5-devel gsoap-devel libvirt-devel autoconf classads-devel ' \
+        + 'libX11-devel libdeltacloud-devel'
+    package_cmd = 'curl https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh && ' \
+                  + 'PATH_TO_CONDOR=$PWD bash make_condor_package_7.x.sh 0dcloud'
 
 class Katello (AeolusModule):
     git_url = 'git://git.fedorahosted.org/git/katello.git'
@@ -306,7 +315,8 @@ class Pulp (AeolusModule):
 class Candlepin (AeolusModule):
     git_url = 'git://git.fedorahosted.org/candlepin.git'
     build_requires = 'ruby rubygems ruby-devel gcc perl-Locale-Msgfmt ' \
-        + 'tomcat6 java-1.6.0-openjdk-devel tito java ant gettext'
+        + 'tomcat6 java-1.6.0-openjdk-devel tito java-1.6.0-openjdk ant gettext ' \
+        + 'https://github.com/downloads/jmrodri/candlepin-deps/candlepin-deps-0.0.18-1.fc13.noarch.rpm'
     package_cmd = 'cd proxy && tito build --rpm --test'
 
 class Pythonrhsm (AeolusModule):
