@@ -94,7 +94,7 @@ class AeolusModule(object):
             # Gather any 'BuildRequires' from the spec files
             detected_requires = list()
             for spec in specfiles:
-                detected_requires += re.findall(r'^BuildRequires:\s*([^\n, ]*)',
+                detected_requires += re.findall(r'^BuildRequires:\s+([^\n, ]*)',
                     open(spec, 'r').read(), re.MULTILINE)
             self.build_requires = ' '.join(detected_requires)
 
@@ -327,10 +327,16 @@ class Pythonrhsm (AeolusModule):
 
 class Matahari (AeolusModule):
     git_url = 'git://github.com/matahari/matahari.git'
+    # FIXME - Once qpid-qmf-devel patch is accepted upstream, the following
+    # list of BuildRequires can be removed in favor of BuildRequires
+    # auto-detection
     build_requires = 'cmake libuuid-devel gcc-c++ pcre-devel glib2-devel ' \
-        + 'sigar-devel libcurl-devel cxxtest help2man ' \
-        + 'qpid-cpp-client-devel qpid-qmf-devel dbus-devel dbus-glib-devel ' \
-        + 'polkit-devel'
+        + 'sigar-devel libcurl-devel help2man augeas-devel ' \
+        + 'qpid-cpp-client-devel qpid-qmf-devel dbus-devel cxxtest ' \
+        + 'redhat-rpm-config mingw32-filesystem mingw32-gcc-c++ ' \
+        + 'mingw32-pcre cmake libuuid-devel gcc-c++ pcre-devel glib2-devel ' \
+        + 'sigar-devel libcurl-devel help2man augeas-devel ' \
+        + 'qpid-cpp-client-devel qpid-qmf-devel dbus-devel cxxtest'
     package_cmd = 'make rpm'
 
 def yum_install_if_needed(packages):
