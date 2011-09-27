@@ -185,14 +185,21 @@ def aeolus_install(opts, requested_modules):
 
     # Install some packages needed to interact with SCM and create packages
     if opts.source == 'git':
-        aeoluslib.yum_install_if_needed(['git', 'make', 'gcc', 'rpm-build',
+        pre_reqs = ['git', 'make', 'gcc', 'rpm-build',
             'rubygem-rake',     # needed by several projects for Rakefile support
             'rubygem-rspec',    # needed by aeolus-configure
             'gettext-devel',    # needed by iwhd
             'gperf',            # needed by iwhd
             'gcc-c++',          # needed by iwhd
             'libtool',          # needed by libdeltacloud
-            ])
+            'tito',             # needed by candlepin
+            ]
+        try:
+            aeoluslib.yum_install_if_needed(pre_reqs)
+        except Exception, e:
+            logging.error("Error: Unable to detect (or install) " \
+                + "pre-requisites: %s\n%s" % (', '.join(pre_reqs), e))
+            sys.exit(1)
 
     # Force specific module install/setup order
     reordered_modlist = ['conductor', 'configure']
