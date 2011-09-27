@@ -40,18 +40,24 @@ workdir = None
 cleanup = True
 
 class AeolusModule(object):
-    # Module name (defaults to __class__.__name__.lower())
-    name = None
-    # SCM URL (only git right now)
-    git_url = None
-    # Shell command needed to build RPMs from SCM
-    package_cmd = 'make rpms'
-    # RPM BuildRequires for specific module
-    build_requires = None
-
     def __init__(self, **kwargs):
-        if hasattr(self, 'name') and self.name is None:
+        # Module name (defaults to __class__.__name__.lower())
+        if not hasattr(self, 'name') or self.name is None:
             self.name = self.__class__.__name__.lower()
+
+        # SCM URL (only git right now)
+        if not hasattr(self, 'git_url') or self.git_url is None:
+            raise Exception("Module %s has no git_url defined" % self.__class__.__name__)
+
+        # Shell command needed to build RPMs from SCM
+        if not hasattr(self, 'package_cmd'):
+            self.package_cmd = 'make rpms'
+
+        # RPM BuildRequires for specific module
+        if hasattr(self, 'build_requires') and isinstance(self.build_requires, str):
+            self.build_requires = shlex.split(self.build_requires)
+        else:
+            self.build_requires = list()
 
         # Define a work directory for any checkouts or temp files
         if kwargs.has_key('workdir'):
@@ -81,8 +87,10 @@ class AeolusModule(object):
                 print e
 
     def _install_buildreqs(self):
-        if self.build_requires is None or \
-           self.build_requires == '':
+
+        assert isinstance(self.build_requires, list)
+
+        if len(self.build_requires) == 0:
             logging.debug("No build requires provided, detecting...")
 
             # Find any files that look like .spec files
@@ -92,18 +100,25 @@ class AeolusModule(object):
                                 if '.spec' in spec]
 
             # Gather any 'BuildRequires' from the spec files
-            detected_requires = list()
             for spec in specfiles:
-                detected_requires += re.findall(r'^BuildRequires:\s+([^\n, ]*)',
-                    open(spec, 'r').read(), re.MULTILINE)
-            self.build_requires = ' '.join(detected_requires)
+                for br in re.findall(r'^BuildRequires:\s+(.*)$', \
+                   open(spec, 'r').read(), re.MULTILINE):
+                    # If this is a versioned compare, only split by comma
+                    if re.search(r'[<>=]', br):
+                        self.build_requires += re.split(r'\s*,\s*', br)
+                    # Otherwise, split by comma or whitespace
+                    else:
+                        self.build_requires += re.split(r'[ ,]*', br)
 
-        if self.build_requires is None or self.build_requires == '':
+            # Remove any duplicates
+            self.build_requires = list(set(self.build_requires))
+
+        if len(self.build_requires) == 0:
             logging.warn("No BuildRequires detected for %s" % \
                 self.name)
         else:
-            logging.info("Installing BuildRequires for %s: %s" % \
-                (self.name, self.build_requires))
+            logging.info("BuildRequires for %s: %s" % \
+                (self.name, ', '.join(self.build_requires)))
             yum_install_if_needed(self.build_requires)
 
     def is_installed(self):
@@ -150,8 +165,7 @@ class AeolusModule(object):
 
     def _clone_from_scm(self):
         '''checkout package from version control'''
-        if not hasattr(self, 'git_url') or self.git_url is None:
-            raise Exception("Module has no self.git_url defined")
+        assert hasattr(self, 'git_url') and self.git_url != ''
 
         cwd = os.getcwd()
         try:
@@ -216,7 +230,6 @@ class AeolusModule(object):
 class Conductor (AeolusModule):
     name = 'aeolus-conductor'
     git_url = 'git://git.fedorahosted.org/git/aeolus/conductor.git'
-    build_requires = 'condor-classads-devel git rest-devel rpm-build ruby-devel zip rubygem-sass'
 
     #def install(self):
     #    '''install package via RPM'''
@@ -251,19 +264,14 @@ class Configure (AeolusModule):
 
 class Oz (AeolusModule):
     git_url = 'git://github.com/clalancette/oz.git'
-    build_requires = 'gcc git make rpm-build'
     package_cmd = 'make rpm'
 
 class Imagefactory (AeolusModule):
     git_url = 'git://github.com/aeolusproject/imagefactory.git'
-    build_requires = 'gcc git make rpm-build'
     package_cmd = 'make rpm'
 
 class Iwhd (AeolusModule):
     git_url = 'git://git.fedorahosted.org/iwhd.git'
-    #build_requires = 'jansson-devel libmicrohttpd-devel hail-devel gc-devel ' \
-    #    + 'git gperf mongodb-devel help2man mongodb-server libcurl-devel ' \
-    #    + 'libuuid-devel'
     package_cmd = './bootstrap && ./configure && make && make rpm'
 
 class Audrey (AeolusModule):
@@ -278,51 +286,32 @@ class Libdeltacloud (AeolusModule):
     git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
     package_cmd = './autogen.sh && ./configure && make rpm'
 
-# Qpid not required, since already packaged in Fedora
-# FIXME - not pulled from GIT, uses existing package
-class Qpid (AeolusModule):
-    build_requires = 'boost-devel e2fsprogs-devel pkgconfig gcc-c++ ' \
-        + 'make autoconf automake ruby libtool help2man doxygen graphviz ' \
-        + 'corosynclib-devel clusterlib-devel cyrus-sasl-devel ' \
-        + 'nss-devel nspr-devel xqilla-devel xerces-c-devel ' \
-        + 'ruby ruby-devel swig libibverbs-devel librdmacm-devel ' \
-        + 'libaio-devel'
-
-# FIXME - incomplete
 class Condor (AeolusModule):
     git_url = 'http://git.condorproject.org/repos/condor.git -b V7_6-branch'
-    build_requires = 'coredumper coredumper-devel git qpid-cpp-server-devel ' \
-        + 'wget imake flex byacc pcre-devel postgresql-devel openssl-devel ' \
-        + 'krb5-devel gsoap-devel libvirt-devel autoconf classads-devel ' \
-        + 'libX11-devel libdeltacloud-devel'
-    package_cmd = 'curl https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh && ' \
+    build_requires = 'imake flex byacc postgresql-devel openssl-devel ' \
+        + 'krb5-devel "gsoap-devel >= 2.7.12-1" libvirt-devel ' \
+        + '"libdeltacloud-devel >= 0.6" libX11-devel cmake ' \
+        + '"classads-devel >= 1.0.4" '
+        #+ 'condor-classads-devel'
+    package_cmd = 'curl -O https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh && ' \
                   + 'PATH_TO_CONDOR=$PWD bash make_condor_package_7.x.sh 0dcloud'
 
 class Katello (AeolusModule):
     git_url = 'git://git.fedorahosted.org/git/katello.git'
     # FIXME - add support for handling provides: rubygem(compass) >= 0.11.5
-    build_requires = 'tito coreutils findutils sed rubygems rubygem-rake ' \
-        + 'rubygem-gettext rubygem-jammit rubygem-compass ' \
-        + 'rubygem-compass-960-plugin'
     package_cmd = 'cd src && tito build --rpm --test'
 
 class Pulp (AeolusModule):
     git_url = 'git://git.fedorahosted.org/pulp.git'
-    build_requires = 'python-devel python-setuptools python-nose ' \
-        + 'rpm-python make checkpolicy selinux-policy hardlink '
     package_cmd = 'tito build --rpm --test'
 
 class Candlepin (AeolusModule):
     git_url = 'git://git.fedorahosted.org/candlepin.git'
-    build_requires = 'ruby rubygems ruby-devel gcc perl-Locale-Msgfmt ' \
-        + 'tomcat6 java-1.6.0-openjdk-devel tito java-1.6.0-openjdk ant gettext ' \
-        + 'https://github.com/downloads/jmrodri/candlepin-deps/candlepin-deps-0.0.18-1.fc13.noarch.rpm'
     package_cmd = 'cd proxy && tito build --rpm --test'
 
 class Pythonrhsm (AeolusModule):
     name = 'python-rhsm'
     git_url = 'git://git.fedorahosted.org/candlepin.git'
-    build_requires = 'python-devel python-setuptools'
     package_cmd = 'cd client/python-rhsm && tito build --rpm --test'
 
 class Matahari (AeolusModule):
@@ -330,35 +319,49 @@ class Matahari (AeolusModule):
     # FIXME - Once qpid-qmf-devel patch is accepted upstream, the following
     # list of BuildRequires can be removed in favor of BuildRequires
     # auto-detection
-    build_requires = 'cmake libuuid-devel gcc-c++ pcre-devel glib2-devel ' \
-        + 'sigar-devel libcurl-devel help2man augeas-devel ' \
-        + 'qpid-cpp-client-devel qpid-qmf-devel dbus-devel cxxtest ' \
-        + 'redhat-rpm-config mingw32-filesystem mingw32-gcc-c++ ' \
-        + 'mingw32-pcre cmake libuuid-devel gcc-c++ pcre-devel glib2-devel ' \
-        + 'sigar-devel libcurl-devel help2man augeas-devel ' \
-        + 'qpid-cpp-client-devel qpid-qmf-devel dbus-devel cxxtest'
     package_cmd = 'make rpm'
 
-def yum_install_if_needed(packages):
+def yum_install_if_needed(dependencies):
+    '''Figure out if the provided dependency is ...
+        1) already satisfied on the installed system
+        2) if not, is it satisfied by a package in the configured repos?
+        3) if so, install it
+    '''
 
-    # convert to a list
-    if isinstance(packages, str):
-        packages = shlex.split(packages)
+    assert isinstance(dependencies, list), \
+        "expecting list, string provided: '%s'" % dependencies
 
-    # Using shlex.split allows for package deps with spaces
     missing_pkgs = list()
-    for pkg in packages:
-        (rc, out) = call('rpm -q %s' % pkg, raiseExc=False)
-        if rc != 0:
-            missing_pkgs.append(pkg)
+    for dep in dependencies:
+        # Is the dependency already satisfied on the installed system?
+        (rc, out) = call("repoquery --qf '%{name}-%{version}-%{release}'" \
+            + " --installed --whatprovides '%s'" % dep)
+        if rc == 0 and out != '':
+            # FIXME - it's possible that multiple packages will satisfy a dep
+            out = out.strip()
+            logging.debug('Installed package %s satisfies dependency: %s' % (out, dep))
+        else:
+            logging.debug('Checking yum repos to satisfy dependency: %s' % dep)
+            # Is the dependency satisfied by packages in the repos?
+            (rc, out) = call('yum --quiet resolvedep "%s"' % dep, raiseExc=False)
+            if rc != 0 or out.startswith('No Package Found'):
+                # FIXME - should this be considered fatal?
+                logging.error("No package satisfies dependency: %s" % dep)
+            else:
+                # expected output format from /usr/share/yum-cli/cli.py :: resolveDepCli()
+                # '%s:%s-%s-%s.%s' % (pkg.epoch, pkg.name, pkg.version, pkg.release, pkg.arch)
+                # strip off the 'epoch:'
+                pkg = out.split(':', 1)[1].strip()
+                missing_pkgs.append(pkg)
 
-    yum_install(missing_pkgs)
+    if len(missing_pkgs) > 0: 
+        logging.info("Installing packages: %s" % ' '.join(missing_pkgs))
+        yum_install(missing_pkgs)
 
 def yum_install(packages, gpgcheck=False):
 
-    # convert to a list
-    if isinstance(packages, str):
-        packages = shlex.split(packages)
+    assert isinstance(packages, list), \
+        "expecting list, string provided: '%s'" % packages
 
     if len(packages) > 0:
         yum_opts = gpgcheck and ' ' or '--nogpgcheck'
