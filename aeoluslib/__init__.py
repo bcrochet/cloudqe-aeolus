@@ -287,7 +287,7 @@ class Iwhd (AeolusModule):
     package_cmd = './bootstrap && ./configure && make && make rpm'
 
 class Audrey (AeolusModule):
-    name = 'aeolus-configserver'
+    #name = 'aeolus-configserver'
     #git_url = 'git://github.com/clalancette/audrey.git -b config-server'
     git_url = 'git://github.com/clalancette/audrey.git'
     package_cmd = 'cd configserver && rake rpm && cd .. && ' \
@@ -298,8 +298,8 @@ class Libdeltacloud (AeolusModule):
     git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
     package_cmd = './autogen.sh && ./configure && make rpm'
 
-class Pacemaker (AeolusModule):
-    name = 'pacemaker-cloud.git'
+class PacemakerCloud (AeolusModule):
+    name = 'pacemaker-cloud'
     git_url = 'git://github.com/pacemaker-cloud/pacemaker-cloud.git'
     package_cmd = './autogen.sh && ./configure && make rpm'
 
