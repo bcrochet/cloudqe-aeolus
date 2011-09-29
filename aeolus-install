@@ -213,12 +213,13 @@ def aeolus_install(opts, requested_modules):
             sys.exit(1)
 
     # Force specific module install/setup order
-    reordered_modlist = ['aeolus-conductor', 'aeolus-configure']
-    # Include everything else
-    reordered_modlist.extend(get_supported_modules())
+    priority_modules = ['aeolus-conductor', 'aeolus-configure']
+    supported_modules = get_supported_modules()
+    # Remove duplicates - doesn't catch ValueError
+    [supported_modules.remove(m) for m in priority_modules]
 
     # Install requested modules
-    for module in reordered_modlist:
+    for module in priority_modules + supported_modules:
         if is_requested(module, requested_modules):
             cls_obj = find_module(module)
             if cls_obj is None:
