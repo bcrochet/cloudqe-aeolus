@@ -50,25 +50,34 @@ def yum_var_subst(buf):
         buf = buf.replace('$'+varname, yb.yumvar[varname])
     return buf
 
-def get_supported_modules():
-    '''Discover supported AeolusModule subclasses'''
-    def is_aeolusmodule(object):
-        '''The built-in issubclass treats classes as subclasses of themselves.
-        This method does not.'''
-        if inspect.isclass(object) \
-           and issubclass(object, aeoluslib.AeolusModule) \
-           and aeoluslib.AeolusModule in object.__bases__:
-            return True
-        return False
+def is_aeolusmodule(object):
+    '''The built-in issubclass treats classes as subclasses of themselves.
+    This method does not.'''
+    if inspect.isclass(object) \
+       and issubclass(object, aeoluslib.AeolusModule) \
+       and aeoluslib.AeolusModule in object.__bases__:
+        return True
+    return False
 
+def get_supported_modules():
+    '''Return a list of supported AeolusModule subclasses'''
     # this is weird, but I use the class attribute (if available), otherwise we
     # just use the class name (lowercased).
     return [hasattr(mbr[1], 'name') and mbr[1].name or mbr[0].lower() \
         for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule)]
 
+def find_module(name):
+    '''Find and return a class with a name class attribute or class name that
+        matches the provided name
+    '''
+    for (objname, obj) in inspect.getmembers(aeoluslib, is_aeolusmodule):
+        if (hasattr(obj, 'name') and obj.name == name) or \
+           name.lower() == objname.lower():
+            return obj
+    return None
+
 def parse_args():
     # Old method - Hard code the list of supported modules
-    # component_list = ['all', 'conductor', 'configure', 'oz', 'imagefactory', 'iwhd', 'audrey',]
     component_list = ['all']
     component_list.extend(get_supported_modules())
 
@@ -204,19 +213,20 @@ def aeolus_install(opts, requested_modules):
             sys.exit(1)
 
     # Force specific module install/setup order
-    reordered_modlist = ['conductor', 'configure']
+    reordered_modlist = ['aeolus-conductor', 'aeolus-configure']
     # Include everything else
     reordered_modlist.extend(get_supported_modules())
+    print 'DEBUG: ', reordered_modlist
 
     # Install requested modules
     for module in reordered_modlist:
         if is_requested(module, requested_modules):
-            cls_name = module.capitalize()
-            if not hasattr(aeoluslib, cls_name):
-                logging.error("Unable to find aeoluslib.%s" % cls_name)
+            cls_obj = find_module(module)
+            if cls_obj is None:
+                logging.error("Unable to find aeoluslib module for %s" % module)
                 sys.exit(1)
 
-            cls_obj = getattr(aeoluslib, cls_name)
+            # Instantiate the module
             cls_inst = cls_obj()
 
             # Install the module
@@ -231,7 +241,7 @@ def aeolus_install(opts, requested_modules):
             # If we installed the package, perform additional setup
             if not opts.build_only:
                 # Activate and start the system service (if applicable)
-                if module in ['conductor', 'imagefactory', 'iwhd']:
+                if module in ['aeolus-conductor', 'imagefactory', 'iwhd']:
                     cls_inst.chkconfig('on')
                     cls_inst.svc_restart()
 
@@ -239,6 +249,7 @@ def aeolus_install(opts, requested_modules):
                 try:
                     cls_inst.setup()
                 except NotImplementedError:
+                    logging.warn("No custom setup defined for %s" % module)
                     pass
 
 if __name__ == "__main__":
