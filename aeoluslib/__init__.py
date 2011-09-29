@@ -403,7 +403,7 @@ def rpm_install(packages):
 
     if len(packages) > 0:
         for p in packages:
-            call('rpm -Uvh '+ str(p)+ ' --force')
+            call('rpm -Uvh '+ str(p)+ ' --nodeps')
 
 
 def str2NVR(s):
