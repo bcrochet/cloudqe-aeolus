@@ -61,7 +61,9 @@ def get_supported_modules():
             return True
         return False
 
-    return [mbr[0].lower() \
+    # this is weird, but I use the class attribute (if available), otherwise we
+    # just use the class name (lowercased).
+    return [hasattr(mbr[1], 'name') and mbr[1].name or mbr[0].lower() \
         for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule)]
 
 def parse_args():
