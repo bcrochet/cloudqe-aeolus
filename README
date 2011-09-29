@@ -13,7 +13,7 @@ $ python aeolus-install --source=yum oz
 $ python aeolus-install --source=yum --repofile=file:///path/to/aeolus.repo audrey
 
 # Build and install aeolus-conductor from git:
-$ python aeolus-install --source=git conductor
+$ python aeolus-install --source=git aeolus-conductor
 
 # Build and install everything from git
 $ python aeolus-install --source=git all
