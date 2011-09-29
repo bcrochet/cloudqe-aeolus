@@ -216,7 +216,6 @@ def aeolus_install(opts, requested_modules):
     reordered_modlist = ['aeolus-conductor', 'aeolus-configure']
     # Include everything else
     reordered_modlist.extend(get_supported_modules())
-    print 'DEBUG: ', reordered_modlist
 
     # Install requested modules
     for module in reordered_modlist:
