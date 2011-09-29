@@ -112,8 +112,9 @@ Examples:
         default=False, help="Don't cleanup after completion",)
     parser.add_option("--build-only", action="store_true", dest="build_only",
         default=False, help="Don't install packages, just build them",)
-    parser.add_option("-d", "--debug", action="store_true", dest="debug",
-        default=False, help="Enable debug output",)
+    parser.add_option("-d", "--debug", action="store_true", dest="debug",)
+    parser.add_option("-f", "--force-install", action="store_true", dest="rpmforce",
+        default=False, help="install packages w/ rpm --force rather than yum",)
 
     (opts, args) = parser.parse_args()
 
@@ -236,7 +237,10 @@ def aeolus_install(opts, requested_modules):
                 if opts.build_only:
                     cls_inst.build_from_scm()
                 else:
-                    cls_inst.install_from_scm()
+                    if opts.rpmforce:
+                        cls_inst.install_rpm_from_scm()
+		    else:
+                        cls_inst.install_from_scm()
 
             # If we installed the package, perform additional setup
             if not opts.build_only:
