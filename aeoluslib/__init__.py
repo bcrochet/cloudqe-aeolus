@@ -226,6 +226,18 @@ class AeolusModule(object):
             logging.info("... %s" % pkg)
         yum_install(non_src_pkgs)
         # FIXME - remove packages from file-system?
+    
+    # shitty duplication, but dont want to change too much w/o jlaska :)
+    def install_rpm_from_scm(self):
+        packages = self.build_from_scm()
+
+        # Strip out any .src.rpm files
+        non_src_pkgs  = [p for p in packages if splitFilename(p)[4] != 'src']
+
+        logging.info("Installing SCM-built packages for '%s'" % self.name)
+        for pkg in non_src_pkgs:
+            logging.info("... %s" % pkg)
+        rpm_install(non_src_pkgs)
 
 class Conductor (AeolusModule):
     name = 'aeolus-conductor'
@@ -383,6 +395,16 @@ def yum_install(packages, gpgcheck=False):
             raiseExc=False)
         if rc != 0:
             raise Exception("Some build dependencies could not be installed")
+
+def rpm_install(packages):
+   
+    assert isinstance(packages, list), \
+        "expecting list, string provided: '%s'" % packages
+
+    if len(packages) > 0:
+        for p in packages:
+            call('rpm -Uvh '+ str(p)+ ' --force')
+
 
 def str2NVR(s):
     '''Convenience method to convert an rpm filename to just NVR'''
