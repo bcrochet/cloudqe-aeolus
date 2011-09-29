@@ -286,6 +286,11 @@ class Libdeltacloud (AeolusModule):
     git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
     package_cmd = './autogen.sh && ./configure && make rpm'
 
+class Pacemaker (AeolusModule):
+    name = 'pacemaker-cloud.git'
+    git_url = 'git://github.com/pacemaker-cloud/pacemaker-cloud.git'
+    package_cmd = './autogen.sh && ./configure && make rpm'
+
 class Condor (AeolusModule):
     git_url = 'http://git.condorproject.org/repos/condor.git -b V7_6-branch'
     build_requires = 'imake flex byacc postgresql-devel openssl-devel ' \
