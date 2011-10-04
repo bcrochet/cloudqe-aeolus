@@ -303,15 +303,16 @@ class PacemakerCloud (AeolusModule):
     git_url = 'git://github.com/pacemaker-cloud/pacemaker-cloud.git'
     package_cmd = './autogen.sh && ./configure && make rpm'
 
-class Condor (AeolusModule):
-    git_url = 'http://git.condorproject.org/repos/condor.git -b V7_6-branch'
-    build_requires = 'imake flex byacc postgresql-devel openssl-devel ' \
-        + 'krb5-devel "gsoap-devel >= 2.7.12-1" libvirt-devel ' \
-        + '"libdeltacloud-devel >= 0.6" libX11-devel cmake ' \
-        + '"classads-devel >= 1.0.4" '
-        #+ 'condor-classads-devel'
-    package_cmd = 'curl -O https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh && ' \
-                  + 'PATH_TO_CONDOR=$PWD bash make_condor_package_7.x.sh 0dcloud'
+# No longer required upstream
+# class Condor (AeolusModule):
+#     git_url = 'http://git.condorproject.org/repos/condor.git -b V7_6-branch'
+#     build_requires = 'imake flex byacc postgresql-devel openssl-devel ' \
+#         + 'krb5-devel "gsoap-devel >= 2.7.12-1" libvirt-devel ' \
+#         + '"libdeltacloud-devel >= 0.6" libX11-devel cmake ' \
+#         + '"classads-devel >= 1.0.4" '
+#         #+ 'condor-classads-devel'
+#     package_cmd = 'curl -O https://raw.github.com/aeolusproject/aeolus-extras/master/condor/make_condor_package_7.x.sh && ' \
+#                   + 'PATH_TO_CONDOR=$PWD bash make_condor_package_7.x.sh 0dcloud'
 
 class Katello (AeolusModule):
     git_url = 'git://git.fedorahosted.org/git/katello.git'
