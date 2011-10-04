@@ -88,11 +88,11 @@ Supported modules include:
 
 Examples:
  * Install oz from git
-   $ install.py --source=git --base_dir=/home oz
+   $ aeolus-install --source=git --base_dir=/home oz
  * Install audrey using yum
-   $ install.py --source=yum audrey
+   $ aeolus-install --source=yum audrey
  * Install everything from git
-   $ install.py --source=git --base_dir=/home all''' % (', '.join(component_list),)
+   $ aeolus-install --source=git --base_dir=/home all''' % (', '.join(component_list),)
 
     parser = optparse.OptionParser(usage=usage_str)
     source_choices = ["yum", "git"]
@@ -175,8 +175,10 @@ def setup_logging(debug=False, logfile=None):
         logger.addHandler(filehandler)
 
 def is_requested(module, requested):
+    # Was module (or all) requested?
     if module in requested or 'all' in requested:
         return True
+
     return False
 
 def aeolus_install(opts, requested_modules):
@@ -210,7 +212,7 @@ def aeolus_install(opts, requested_modules):
             aeoluslib.yum_install_if_needed(pre_reqs)
         except Exception, e:
             logging.error("Error: Unable to detect (or install) " \
-                + "pre-requisites: %s\n%s" % (', '.join(pre_reqs), e))
+                + "pre-requisites: %s\n%s" % (' '.join(pre_reqs), e))
             sys.exit(1)
 
     # Force specific module install/setup order
