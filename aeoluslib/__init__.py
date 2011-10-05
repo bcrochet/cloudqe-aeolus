@@ -332,6 +332,10 @@ class Pythonrhsm (AeolusModule):
     git_url = 'git://git.fedorahosted.org/candlepin.git'
     package_cmd = 'cd client/python-rhsm && tito build --rpm --test'
 
+class Gofer (AeolusModule):
+    git_url = 'git://git.fedorahosted.org/gofer.git'
+    package_cmd = 'tito build --rpm --test'
+
 class Matahari (AeolusModule):
     git_url = 'git://github.com/matahari/matahari.git'
     # FIXME - Once qpid-qmf-devel patch is accepted upstream, the following
