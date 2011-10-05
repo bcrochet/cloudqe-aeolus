@@ -332,6 +332,10 @@ class Pythonrhsm (AeolusModule):
     git_url = 'git://git.fedorahosted.org/candlepin.git'
     package_cmd = 'cd client/python-rhsm && tito build --rpm --test'
 
+class Headpin (AeolusModule):
+    git_url = 'git://git.fedorahosted.org/headpin.git'
+    package_cmd = 'tito build --rpm --test'
+
 class Gofer (AeolusModule):
     git_url = 'git://git.fedorahosted.org/gofer.git'
     package_cmd = 'tito build --rpm --test'
@@ -369,14 +373,14 @@ def yum_install_if_needed(dependencies):
             if rc != 0 or out.startswith('No Package Found'):
                 # FIXME - should this be considered fatal?
                 logging.error("No package satisfies dependency: %s" % dep)
-            else:
+            elif re.match(r'^\d+:', out):
                 # expected output format from /usr/share/yum-cli/cli.py :: resolveDepCli()
                 # '%s:%s-%s-%s.%s' % (pkg.epoch, pkg.name, pkg.version, pkg.release, pkg.arch)
                 # strip off the 'epoch:'
                 pkg = out.split(':', 1)[1].strip()
                 missing_pkgs.append(pkg)
 
-    if len(missing_pkgs) > 0: 
+    if len(missing_pkgs) > 0:
         logging.info("Installing packages: %s" % ' '.join(missing_pkgs))
         yum_install(missing_pkgs)
 
