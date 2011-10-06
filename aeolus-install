@@ -61,9 +61,14 @@ def get_supported_modules():
 
 def get_supported_aliases():
     '''Return a list of supported AeolusModule names'''
-    return {mbr[0].lower(): mbr[1].name \
+    # The following doesn't work in python-2.6 (or older)
+    #if sys.version_info > (2, 6):
+    #    return {mbr[0].lower(): mbr[1].name \
+    #        for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule) \
+    #        if hasattr(mbr[1], 'name')}
+    return dict((mbr[0].lower(), mbr[1].name) \
         for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule) \
-        if hasattr(mbr[1], 'name')}
+        if hasattr(mbr[1], 'name'))
 
 def find_module(name):
     '''Find and return a class with either ...
