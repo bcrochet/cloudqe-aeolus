@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # aeoluslib.py - library for installing and enabling aeolus* modules
 #
