@@ -54,15 +54,21 @@ def is_aeolusmodule(object):
     return False
 
 def get_supported_modules():
-    '''Return a list of supported AeolusModule subclasses'''
     # this is weird, but I use the class attribute (if available), otherwise we
     # just use the class name (lowercased).
     return [hasattr(mbr[1], 'name') and mbr[1].name or mbr[0].lower() \
         for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule)]
 
+def get_supported_aliases():
+    '''Return a list of supported AeolusModule names'''
+    return {mbr[0].lower(): mbr[1].name \
+        for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule) \
+        if hasattr(mbr[1], 'name')}
+
 def find_module(name):
-    '''Find and return a class with a name class attribute or class name that
-        matches the provided name
+    '''Find and return a class with either ...
+        1) a class attribute of 'name' that matches the provided name, or
+        2) a class whose name (lower-case) matches provided name
     '''
     for (objname, obj) in inspect.getmembers(aeoluslib, is_aeolusmodule):
         if (hasattr(obj, 'name') and obj.name == name) or \
@@ -127,9 +133,14 @@ Examples:
     # Sanity component list
     if len(args) <= 0:
         parser.error("No component provided")
+
+    component_alias_dict = get_supported_aliases()
     for a in args:
-        if a not in component_list:
+        if not (a in component_list or a in component_alias_dict.keys()):
             parser.error("Unknown component selected: %s" % a)
+    # Replace any aliases with the true module name
+    args = [a in component_alias_dict.keys() and component_alias_dict[a] or a \
+                for a in args]
 
     return (opts, args)
 
