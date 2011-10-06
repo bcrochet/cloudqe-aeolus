@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 #
-# aeoluslib.py - Helper library for installing and enabling aeolus*
+# aeoluslib.py - library for installing and enabling aeolus* modules
 #
 # Copyright (C) 2011  Red Hat
+# James Laska <jlaska@redhat.com>
+# Aziza Karol <akarol@redhat.com>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -16,9 +18,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-#
-# Author(s): Aziza Karol <akarol@redhat.com>
-#            James Laska <jlaska@redhat.com>
 #
 
 import os
