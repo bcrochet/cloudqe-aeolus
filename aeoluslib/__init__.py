@@ -286,8 +286,7 @@ class Iwhd (AeolusModule):
 
 class Audrey (AeolusModule):
     #name = 'aeolus-configserver'
-    #git_url = 'git://github.com/clalancette/audrey.git -b config-server'
-    git_url = 'git://github.com/clalancette/audrey.git'
+    git_url = 'git://github.com/aeolusproject/audrey.git'
     package_cmd = 'cd configserver && rake rpm && cd .. && ' \
                 + 'cd audrey_puppet && make rpms && cd .. && ' \
                 + 'cd audrey_start && make rpms'
