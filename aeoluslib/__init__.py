@@ -239,7 +239,7 @@ class AeolusModule(object):
 
 class Conductor (AeolusModule):
     name = 'aeolus-conductor'
-    git_url = 'git://git.fedorahosted.org/git/aeolus/conductor.git'
+    git_url = 'git://github.com/aeolusproject/conductor.git'
 
     #def install(self):
     #    '''install package via RPM'''
@@ -254,7 +254,7 @@ class Conductor (AeolusModule):
 
 class Configure (AeolusModule):
     name = 'aeolus-configure'
-    git_url = 'git://git.fedorahosted.org/git/aeolus/configure.git'
+    git_url = 'git://github.com/aeolusproject/aeolus-configure.git'
     package_cmd = 'rake rpms'
 
     def uninstall(self):
