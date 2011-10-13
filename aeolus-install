@@ -251,7 +251,7 @@ def aeolus_install(opts, requested_modules):
                 else:
                     if opts.rpmforce:
                         cls_inst.install_rpm_from_scm()
-		    else:
+            else:
                         cls_inst.install_from_scm()
 
             # If we installed the package, perform additional setup
