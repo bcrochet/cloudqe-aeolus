@@ -163,7 +163,8 @@ class AeolusModule(object):
 
     def _clone_from_scm(self):
         '''checkout package from version control'''
-        assert hasattr(self, 'git_url') and self.git_url != ''
+        assert hasattr(self, 'git_url') and self.git_url != '', \
+            "Object missing git_url"
 
         cwd = os.getcwd()
         try:
@@ -182,7 +183,6 @@ class AeolusModule(object):
             # return to old directory
             if os.getcwd() != cwd:
                 os.chdir(cwd)
-        self.cloned = True
 
     def _make_rpms(self):
         '''Runs self.package_cmd and returns a list of built packages'''
