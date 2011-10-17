@@ -213,7 +213,7 @@ class AeolusModule(object):
         self._install_buildreqs()
         return self._make_rpms()
 
-    def install_from_scm(self):
+    def install_from_scm(self, force=False):
         packages = self.build_from_scm()
 
         # Strip out any .src.rpm files
@@ -222,20 +222,13 @@ class AeolusModule(object):
         logging.info("Installing SCM-built packages for '%s'" % self.name)
         for pkg in non_src_pkgs:
             logging.info("... %s" % pkg)
-        yum_install(non_src_pkgs)
+
+        # Install packages
+        if force:
+            rpm_install(non_src_pkgs)
+        else:
+            yum_install(non_src_pkgs)
         # FIXME - remove packages from file-system?
-    
-    # shitty duplication, but dont want to change too much w/o jlaska :)
-    def install_rpm_from_scm(self):
-        packages = self.build_from_scm()
-
-        # Strip out any .src.rpm files
-        non_src_pkgs  = [p for p in packages if splitFilename(p)[4] != 'src']
-
-        logging.info("Installing SCM-built packages for '%s'" % self.name)
-        for pkg in non_src_pkgs:
-            logging.info("... %s" % pkg)
-        rpm_install(non_src_pkgs)
 
 class Conductor (AeolusModule):
     name = 'aeolus-conductor'
@@ -367,15 +360,20 @@ def yum_install_if_needed(dependencies):
             logging.debug('Checking yum repos to satisfy dependency: %s' % dep)
             # Is the dependency satisfied by packages in the repos?
             (rc, out) = call('yum --quiet resolvedep "%s"' % dep, raiseExc=False)
-            if rc != 0 or out.startswith('No Package Found'):
+            if rc != 0:
                 # FIXME - should this be considered fatal?
                 logging.error("No package satisfies dependency: %s" % dep)
-            elif re.match(r'^\d+:', out):
-                # expected output format from /usr/share/yum-cli/cli.py :: resolveDepCli()
-                # '%s:%s-%s-%s.%s' % (pkg.epoch, pkg.name, pkg.version, pkg.release, pkg.arch)
-                # strip off the 'epoch:'
-                pkg = out.split(':', 1)[1].strip()
-                missing_pkgs.append(pkg)
+            else:
+                # scan output to find a match ... yes this is not ideal and
+                # would be better handled through some yum API
+                for line in out.split('\n'):
+                    if re.match(r'^\d+:[^\s]+$', out):
+                        # expected output format from /usr/share/yum-cli/cli.py
+                        # resolveDepCli() '%s:%s-%s-%s.%s' % (pkg.epoch,
+                        # pkg.name, pkg.version, pkg.release, pkg.arch) strip off
+                        # the 'epoch:'
+                        pkg = out.split(':', 1)[1].strip()
+                        missing_pkgs.append(pkg)
 
     if len(missing_pkgs) > 0:
         logging.info("Installing packages: %s" % ' '.join(missing_pkgs))
@@ -403,14 +401,13 @@ def yum_install(packages, gpgcheck=False):
             raise Exception("Some build dependencies could not be installed")
 
 def rpm_install(packages):
-   
+
     assert isinstance(packages, list), \
         "expecting list, string provided: '%s'" % packages
 
+    # FIXME - find out how to do this with yum installed ... --nodeps is bad
     if len(packages) > 0:
-        for p in packages:
-            call('rpm -Uvh '+ str(p)+ ' --nodeps')
-
+        call('rpm -Uvh --nodeps ' + ' '.join(packages))
 
 def str2NVR(s):
     '''Convenience method to convert an rpm filename to just NVR'''
