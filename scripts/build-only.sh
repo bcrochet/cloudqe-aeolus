@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 #
-# Helper script to automate downloading and running aeolus-install
+# Helper script to automate downloading and running aeolus-helper
 #
 # Copyright (C) 2011  Red Hat
 # James Laska <jlaska@redhat.com>
@@ -19,7 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AEOLUS_INSTALL_OPTS="--source=git --build-only"
+AEOLUS_INSTALL_OPTS=""
 
 # Determine what module we've been asked to test
 if [ $# -gt 0 ]; then
@@ -52,5 +52,5 @@ fi
 
 # FIXME - it would be nice to use the git checkout jenkins already did
 # located in $WORKSPACE
-python aeolus-install $AEOLUS_INSTALL_OPTS "$PROJECT"
+python aeolus-helper build $AEOLUS_INSTALL_OPTS "$PROJECT"
 exit $?
