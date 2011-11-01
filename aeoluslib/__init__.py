@@ -462,6 +462,11 @@ def yum_install_if_needed(dependencies):
     assert isinstance(dependencies, list), \
         "expecting list, string provided: '%s'" % dependencies
 
+    # make sure yum-utils are installed
+    (rc, out) = call("rpm -q yum-utils", False)
+    if 'is not installed' in out:
+        call("yum -y install yum-utils")
+
     missing_pkgs = list()
     for dep in dependencies:
         # Is the dependency already satisfied on the installed system?
