@@ -93,11 +93,11 @@ Supported modules include:
 
 Examples:
  * Install oz from git
-   $ aeolus-install --source=git --base_dir=/home oz
+   $ aeolus-install --source=git --basedir=/home oz
  * Install audrey using yum
    $ aeolus-install --source=yum audrey
  * Install everything from git
-   $ aeolus-install --source=git --base_dir=/home all''' % (', '.join(component_list),)
+   $ aeolus-install --source=git --basedir=/home all''' % (', '.join(component_list),)
 
     parser = optparse.OptionParser(usage=usage_str)
     source_choices = ["yum", "git"]
@@ -109,7 +109,7 @@ Examples:
         #default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
         default=[],
         help="Specify custom yum .repo file(s) for use with --source=yum. (default: %default)")
-    parser.add_option("-p", "--base_dir", action="store", dest="base_dir",
+    parser.add_option("-p", "--basedir", action="store", dest="basedir",
         default=None, help="providing a base dir for installation")
     parser.add_option("--log", action="store", dest="logfile",
         default=None, help="Log output to a file")
@@ -128,9 +128,9 @@ Examples:
     if opts.source not in o.choices:
         parser.error("Must provide value for %s" % o.get_opt_string())
 
-    # Sanity --base_dir
+    # Sanity --basedir
     if opts.source == 'git':
-        '''FIXME - optionally sanitize opts.base_dir'''
+        '''FIXME - optionally sanitize opts.basedir'''
 
     elif opts.source == 'yum':
         '''FIXME - optionally sanitize opts.repofile'''
@@ -203,9 +203,9 @@ def aeolus_install(opts, requested_modules):
     if opts.no_clean:
         aeoluslib.cleanup = False
 
-    # Define a base_dir for all git operations
-    if opts.source == 'git' and opts.base_dir:
-        aeoluslib.workdir = opts.base_dir
+    # Define a basedir for all git operations
+    if opts.source == 'git' and opts.basedir:
+        aeoluslib.workdir = opts.basedir
 
     # Install some packages needed to interact with SCM and create packages
     if opts.source == 'git':
