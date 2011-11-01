@@ -167,9 +167,8 @@ class AeolusModule(object):
 
         assert isinstance(self.build_requires, list)
 
-        if len(self.build_requires) == 0:
-            logging.debug("No build requires provided, detecting...")
-            self.build_requires = self._detect_buildreqs()
+        logging.debug("Detecting build requirements ...")
+        self.build_requires += self._detect_buildreqs()
 
         if len(self.build_requires) == 0:
             logging.warn("No BuildRequires detected for %s" % \
@@ -380,7 +379,9 @@ class AeolusImage (AeolusModule):
 
 class Oz (AeolusModule):
     git_url = 'git://github.com/clalancette/oz.git'
-    unittest_cmd = 'make virtualenv unittests'
+    # Specify additional custom build-requirements
+    build_requires = 'python-virtualenv python-pip'
+    unittest_cmd = 'make clean virtualenv unittests'
     package_cmd = 'make rpm'
 
 class Imagefactory (AeolusModule):
