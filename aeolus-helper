@@ -24,10 +24,11 @@ import sys
 import optparse
 import logging
 import yum
-import inspect
 
 try:
     import aeoluslib
+    from aeoluslib.cli import *
+    from aeoluslib.logger import setup_logging
 except ImportError:
     print "Unable to import aeoluslib.  Is aeoluslib in PYTHONPATH?"
     sys.exit(1)
@@ -44,146 +45,6 @@ def yum_var_subst(buf):
         buf = buf.replace('$'+varname, yb.yumvar[varname])
     return buf
 
-def is_aeolusmodule(object):
-    '''The built-in issubclass treats classes as subclasses of themselves.
-    This method does not.'''
-    if inspect.isclass(object) \
-       and issubclass(object, aeoluslib.AeolusModule) \
-       and aeoluslib.AeolusModule in object.__bases__:
-        return True
-    return False
-
-def get_supported_modules():
-    # this is weird, but I use the class attribute (if available), otherwise we
-    # just use the class name (lowercased).
-    return [hasattr(mbr[1], 'name') and mbr[1].name or mbr[0].lower() \
-        for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule)]
-
-def get_supported_aliases():
-    '''Return a list of supported AeolusModule names'''
-    # The following doesn't work in python-2.6 (or older)
-    #if sys.version_info > (2, 6):
-    #    return {mbr[0].lower(): mbr[1].name \
-    #        for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule) \
-    #        if hasattr(mbr[1], 'name')}
-    return dict((mbr[0].lower(), mbr[1].name) \
-        for mbr in inspect.getmembers(aeoluslib, is_aeolusmodule) \
-        if hasattr(mbr[1], 'name'))
-
-def find_module(name):
-    '''Find and return a class with either ...
-        1) a class attribute of 'name' that matches the provided name, or
-        2) a class whose name (lower-case) matches provided name
-    '''
-    for (objname, obj) in inspect.getmembers(aeoluslib, is_aeolusmodule):
-        if (hasattr(obj, 'name') and obj.name == name) or \
-           name.lower() == objname.lower():
-            return obj
-    return None
-
-def parse_args():
-    # Old method - Hard code the list of supported modules
-    component_list = ['all']
-    component_list.extend(get_supported_modules())
-
-    usage_str = '''%%prog [options] [module(s)]
-
-Supported modules include:
- %s
-
-Examples:
- * Install oz from git
-   $ aeolus-install --source=git --basedir=/home oz
- * Install audrey using yum
-   $ aeolus-install --source=yum audrey
- * Install everything from git
-   $ aeolus-install --source=git --basedir=/home all''' % (', '.join(component_list),)
-
-    parser = optparse.OptionParser(usage=usage_str)
-    source_choices = ["yum", "git"]
-    parser.add_option("--source", action="store", default=None,
-        type="choice", choices=source_choices,
-        help="Install source to use for install (options: %s)" %
-            ", ".join(source_choices))
-    parser.add_option("--repofile", action="append",
-        #default=['http://repos.fedorapeople.org/repos/aeolus/conductor/testing/fedora-aeolus-testing.repo'],
-        default=[],
-        help="Specify custom yum .repo file(s) for use with --source=yum. (default: %default)")
-    parser.add_option("-p", "--basedir", action="store", dest="basedir",
-        default=None, help="providing a base dir for installation")
-    parser.add_option("--log", action="store", dest="logfile",
-        default=None, help="Log output to a file")
-    parser.add_option("--no-clean", action="store_true", dest="no_clean",
-        default=False, help="Don't cleanup after completion",)
-    parser.add_option("--build-only", action="store_true", dest="build_only",
-        default=False, help="Don't install packages, just build them",)
-    parser.add_option("-d", "--debug", action="store_true", dest="debug",)
-    parser.add_option("-f", "--force-install", action="store_true", dest="rpmforce",
-        default=False, help="install packages w/ rpm --force rather than yum",)
-
-    (opts, args) = parser.parse_args()
-
-    # Sanitize source
-    o = parser.get_option("--source")
-    if opts.source not in o.choices:
-        parser.error("Must provide value for %s" % o.get_opt_string())
-
-    # Sanity --basedir
-    if opts.source == 'git':
-        '''FIXME - optionally sanitize opts.basedir'''
-
-    elif opts.source == 'yum':
-        '''FIXME - optionally sanitize opts.repofile'''
-
-    # Sanity component list
-    if len(args) <= 0:
-        parser.error("No component provided")
-
-    component_alias_dict = get_supported_aliases()
-    for a in args:
-        if not (a in component_list or a in component_alias_dict.keys()):
-            parser.error("Unknown component selected: %s" % a)
-    # Replace any aliases with the true module name
-    args = [a in component_alias_dict.keys() and component_alias_dict[a] or a \
-                for a in args]
-
-    return (opts, args)
-
-def setup_logging(debug=False, logfile=None):
-
-    # Normal or debug?
-    if debug:
-        logging_format = '%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s'
-        logging_level = logging.DEBUG
-    else:
-        #logging_format = '%(asctime)s %(levelname)s %(message)s'
-        #logging_format = '(%(levelname)s) %(message)s'
-        logging_format = '%(message)s'
-        logging_level = logging.INFO
-
-    # Configure root logger
-    logging.basicConfig(level=logging_level,
-                        format=logging_format,
-                        datefmt='%Y-%d-%m %I:%M:%S')
-
-    # HACK - the above doesn't properly set the desired level, so the
-    # following fixes that
-    logger = logging.getLogger()
-    logger.setLevel(logging_level)
-
-    # Optionally attach a fileHandler
-    if logfile is not None:
-        try:
-            logger
-        except NameError: # in case someone fixes basicConfig above
-            logger = logging.getLogger()
-
-        filehandler = logging.FileHandler(logfile, 'a')
-        # Use format from root logger
-        filehandler.setFormatter(logging.Formatter(logger.handlers[0].formatter._fmt,
-                                 logger.handlers[0].formatter.datefmt))
-        logger.addHandler(filehandler)
-
 def is_requested(module, requested):
     # Was module (or all) requested?
     if module in requested or 'all' in requested:
@@ -191,9 +52,11 @@ def is_requested(module, requested):
 
     return False
 
-def aeolus_install(opts, requested_modules):
+def main(opts, requested_modules):
     # FIXME - detect whether running in SELinux enforcing
     # FIXME - remind about firewall changes?
+    command = requested_modules[0]
+    requested_modules = requested_modules[1:]
 
     # If directed, enable custom repofiles
     if opts.repofile:
@@ -208,7 +71,7 @@ def aeolus_install(opts, requested_modules):
         aeoluslib.workdir = opts.basedir
 
     # Install some packages needed to interact with SCM and create packages
-    if opts.source == 'git':
+    if command == 'build' and opts.source == 'git':
         pre_reqs = ['git', 'make', 'gcc', 'rpm-build',
             'rubygem-rake',     # needed by several projects for Rakefile support
             'rubygem-rspec',    # needed by aeolus-configure
@@ -242,17 +105,22 @@ def aeolus_install(opts, requested_modules):
             # Instantiate the module
             cls_inst = cls_obj()
 
-            # Install the module
-            if opts.source == 'yum':
-                cls_inst.install()
-            elif opts.source == 'git':
-                if opts.build_only:
+            # build =======================================
+            if command == 'build':
+                if opts.source == 'git':
                     cls_inst.build_from_scm()
                 else:
+                    logging.error("No support for building from --source=yum")
+                    sys.exit(1)
+
+            # install =====================================
+            elif command == 'install':
+
+                if opts.source == 'yum':
+                    cls_inst.install()
+                elif opts.source == 'git':
                     cls_inst.install_from_scm(opts.rpmforce)
 
-            # If we installed the package, perform additional setup
-            if not opts.build_only:
                 # Activate and start the system service (if applicable)
                 if module in ['aeolus-conductor', 'imagefactory', 'iwhd']:
                     cls_inst.chkconfig('on')
@@ -265,6 +133,31 @@ def aeolus_install(opts, requested_modules):
                     logging.warn("No custom setup defined for %s" % module)
                     pass
 
+            # list-requires ===============================
+            elif command == 'list-requires':
+                print '\n'.join(cls_inst.list_requires())
+
+            # list-buildrequires ==========================
+            elif command == 'list-buildrequires':
+                print '\n'.join(cls_inst.list_buildreqs())
+
+            # install-requires ============================
+            elif command == 'install-requires':
+                cls_inst.install_requires()
+
+            # install-buildrequires =======================
+            elif command == 'install-buildrequires':
+                cls_inst.install_buildreqs()
+
+            # unittest ====================================
+            elif command == 'unittest':
+                cls_inst.unittest()
+
+            # ls-remote ===================================
+            elif command == 'ls-remote':
+                githash = cls_inst.get_remote_hash('master')
+                print "%s (master) - %s" % (cls_inst.name, githash)
+
 if __name__ == "__main__":
 
     # Process arguments
@@ -274,7 +167,7 @@ if __name__ == "__main__":
     setup_logging(opts.debug, opts.logfile)
 
     try:
-        aeolus_install(opts, requested_modules)
+        main(opts, requested_modules)
     except KeyError:
         print "Exiting upon user request"
         sys.exit(1)

@@ -4,16 +4,25 @@
 # Update aeolus components
 
 # Display usage information
-$ python aeolus-install --help
+$ python aeolus-helper --help
 
 # Install oz from existing yum repositories
-$ python aeolus-install --source=yum oz
+$ python aeolus-helper --source=yum install oz
 
 # Install audrey using yum, include provided repo during installation
-$ python aeolus-install --source=yum --repofile=file:///path/to/aeolus.repo audrey
+$ python aeolus-helper --source=yum --repofile=file:///path/to/aeolus.repo install audrey
 
-# Build and install aeolus-conductor from git:
-$ python aeolus-install --source=git aeolus-conductor
+# Build and install aeolus-conductor from git (--source=git implied):
+$ python aeolus-helper install aeolus-conductor
 
 # Build and install everything from git
-$ python aeolus-install --source=git all
+$ python aeolus-helper install all
+
+# Build 'audrey' from git
+$ python aeolus-helper build audrey
+
+# Install build requirements for 'libdeltacloud'
+$ python aeolus-helper install-buildrequires libdeltacloud
+#
+# Install requirements for 'aeolus-configure'
+$ python aeolus-helper install-requires aeolus-configure

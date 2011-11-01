@@ -27,6 +27,8 @@ import errno
 import logging
 import tempfile
 import shlex
+import json
+import urlparse, urlgrabber
 from rpmUtils.miscutils import splitFilename
 
 # Module-wide support for specifying a working directory
@@ -51,6 +53,10 @@ class AeolusModule(object):
         if not hasattr(self, 'package_cmd'):
             self.package_cmd = 'make rpms'
 
+        # Shell command needed to run built-in unittests from SCM
+        if not hasattr(self, 'unittest_cmd'):
+            self.unittest_cmd = 'make test'
+
         # RPM BuildRequires for specific module
         if hasattr(self, 'build_requires') and isinstance(self.build_requires, str):
             self.build_requires = shlex.split(self.build_requires)
@@ -70,7 +76,8 @@ class AeolusModule(object):
     def setup(self):
         raise NotImplementedError("Not implemented by derived class")
 
-    # NOTE: Isn't always called when object is removed (search interwebs for reasons)
+    # NOTE: Isn't always called when object is removed (search interwebs for
+    # reasons)
     def __del__(self):
         '''perform cleanup if desired (default)'''
         if cleanup:
@@ -84,32 +91,85 @@ class AeolusModule(object):
             except OSError, e:
                 print e
 
+    def list_buildreqs(self):
+        self._clone_from_scm()
+        return self._detect_buildreqs()
+
+    def install_buildreqs(self):
+        self._clone_from_scm()
+        deps = self._detect_buildreqs()
+        logging.info("BuildRequires for %s: %s" % \
+            (self.name, ', '.join(deps)))
+        yum_install_if_needed(deps)
+
+    def _detect_buildreqs(self):
+        '''Return a list of 'BuildRequires' listed in the .spec'''
+        return self._detect_dependencies('BuildRequires')
+
+    def list_requires(self):
+        self._clone_from_scm()
+        return self._detect_requires()
+
+    def install_requires(self):
+        self._clone_from_scm()
+        deps = self._detect_requires()
+        logging.info("Requires for %s: %s" % \
+            (self.name, ', '.join(deps)))
+        yum_install_if_needed(deps)
+
+    def _detect_requires(self):
+        '''Return a list of 'Requires' listed in the .spec'''
+        return self._detect_dependencies('Requires')
+
+    def _detect_dependencies(self, deptype):
+        '''Scan .spec file and return list of deps
+        '''
+
+        assert deptype in ['BuildRequires', 'Requires'], \
+            "Unknown dependency type requested: " % deptype
+
+        # Find any files that look like .spec files
+        specfiles = list()
+        for root, dirs, files in os.walk(self.workdir):
+            specfiles += [os.path.join(root, spec) for spec in files \
+                            if '.spec' in spec]
+
+        if len(specfiles) <= 0:
+            logging.warn("No .spec files found")
+
+        deps = list()
+        # Gather any 'BuildRequires' from the spec files
+        for spec in specfiles:
+            for br in re.findall(r'^%s:\s+(.*)$' % deptype, \
+               open(spec, 'r').read(), re.MULTILINE):
+                # If this is a versioned compare, only split by comma
+                if re.search(r'[<>=]', br):
+                    deps += re.split(r'\s*,\s*', br)
+                # Otherwise, split by comma or whitespace
+                else:
+                    deps += re.split(r'[ ,]*', br)
+
+        # Remove any duplicates
+        return list(set(deps))
+
+    def _install_reqs(self):
+        runtime_reqs = self._detect_requires()
+
+        if len(runtime_reqs) == 0:
+            logging.warn("No Requires detected for %s" % \
+                self.name)
+        else:
+            logging.info("Requires for %s: %s" % \
+                (self.name, ', '.join(runtime_reqs)))
+            yum_install_if_needed(runtime_reqs)
+
     def _install_buildreqs(self):
 
         assert isinstance(self.build_requires, list)
 
         if len(self.build_requires) == 0:
             logging.debug("No build requires provided, detecting...")
-
-            # Find any files that look like .spec files
-            specfiles = list()
-            for root, dirs, files in os.walk(self.workdir):
-                specfiles += [os.path.join(root, spec) for spec in files \
-                                if '.spec' in spec]
-
-            # Gather any 'BuildRequires' from the spec files
-            for spec in specfiles:
-                for br in re.findall(r'^BuildRequires:\s+(.*)$', \
-                   open(spec, 'r').read(), re.MULTILINE):
-                    # If this is a versioned compare, only split by comma
-                    if re.search(r'[<>=]', br):
-                        self.build_requires += re.split(r'\s*,\s*', br)
-                    # Otherwise, split by comma or whitespace
-                    else:
-                        self.build_requires += re.split(r'[ ,]*', br)
-
-            # Remove any duplicates
-            self.build_requires = list(set(self.build_requires))
+            self.build_requires = self._detect_buildreqs()
 
         if len(self.build_requires) == 0:
             logging.warn("No BuildRequires detected for %s" % \
@@ -177,12 +237,32 @@ class AeolusModule(object):
             else:
                 logging.info("Checking out %s from %s into %s" % (self.name, \
                     self.git_url, self.workdir))
-                (rc, clone_log) = call('git clone %s %s' % (self.git_url, \
+                (rc, clone_log) = call('git clone %s "%s"' % (self.git_url, \
                     self.workdir))
         finally:
             # return to old directory
             if os.getcwd() != cwd:
                 os.chdir(cwd)
+
+    def unittest(self):
+        # self._clone_from_scm()
+        self.install_requires()
+        return self._run_unittests()
+
+    def _run_unittests(self):
+        '''Runs self.unittest_cmd and returns exit code'''
+        logging.info("Running unittests for %s" % self.name)
+        cwd = os.getcwd()
+        test_log = ''
+        try:
+            os.chdir(self.workdir)
+            (rc, test_log) = call(self.unittest_cmd)
+        finally:
+            # return to old directory
+            if os.getcwd() != cwd:
+                os.chdir(cwd)
+
+        # FIXME - pass/fail?
 
     def _make_rpms(self):
         '''Runs self.package_cmd and returns a list of built packages'''
@@ -230,6 +310,34 @@ class AeolusModule(object):
             yum_install(non_src_pkgs)
         # FIXME - remove packages from file-system?
 
+    def get_remote_hash(self, branch):
+        '''Return the git-hash for the most recent commit on the specified
+           branch'''
+        assert isinstance(branch, str), "branch argument must be a string"
+
+        u = urlparse.urlparse(self.git_url)
+        if u.scheme == 'git':
+            if u.netloc == 'github.com':
+                # Formulate API call
+                json_url = "http://%s/api/v2/json/repos/show%s/branches" \
+                    % (u.netloc, re.sub(r'\.git$', '', u.path))
+                json_data = json.loads(urlgrabber.urlopen(json_url).read())
+                if isinstance(json_data, dict):
+                    return json_data.get('branches', {}).get(branch, 'UNKNOWN')
+                else:
+                    logging.error("Unknown json data format: %s" % type(json_data))
+            else:
+                # git ls-remote git://git.fedorahosted.org/git/aeolus/conductor.git refs/heads/master
+                (rc, out) = call("git ls-remote %s refs/heads/%s" % (self.git_url, branch))
+                if rc == 0:
+                    out = out.strip() # yank off newline char
+                    return out.split()[0]
+                else:
+                    logging.error("Unable to query repository: %s" % u)
+        else:
+            logging.error("Unhandled SCM format: %s" % u.scheme)
+
+
 class Conductor (AeolusModule):
     name = 'aeolus-conductor'
     git_url = 'git://github.com/aeolusproject/conductor.git'
@@ -265,8 +373,14 @@ class Configure (AeolusModule):
         cmd = 'aeolus-configure'
         (rc, out) = call(cmd)
 
+class AeolusImage (AeolusModule):
+    name = 'aeolus-image'
+    git_url = 'git://github.com/aeolusproject/aeolus-image.git'
+    package_cmd = 'rake rpm'
+
 class Oz (AeolusModule):
     git_url = 'git://github.com/clalancette/oz.git'
+    unittest_cmd = 'make virtualenv unittests'
     package_cmd = 'make rpm'
 
 class Imagefactory (AeolusModule):
@@ -280,6 +394,7 @@ class Iwhd (AeolusModule):
 class Audrey (AeolusModule):
     #name = 'aeolus-configserver'
     git_url = 'git://github.com/aeolusproject/audrey.git'
+    unittest_cmd = 'python audrey_start/test_audrey_startup.py'
     package_cmd = 'cd configserver && rake rpm && cd .. && ' \
                 + 'cd audrey_puppet && make rpms && cd .. && ' \
                 + 'cd audrey_start && make rpms'
@@ -362,10 +477,11 @@ def yum_install_if_needed(dependencies):
             (rc, out) = call('yum --quiet resolvedep "%s"' % dep, raiseExc=False)
             if rc != 0:
                 # FIXME - should this be considered fatal?
-                logging.error("No package satisfies dependency: %s" % dep)
+                logging.warn("No package satisfies dependency: %s" % dep)
             else:
                 # scan output to find a match ... yes this is not ideal and
                 # would be better handled through some yum API
+                found = False
                 for line in out.split('\n'):
                     if re.match(r'^\d+:[^\s]+$', out):
                         # expected output format from /usr/share/yum-cli/cli.py
@@ -374,6 +490,9 @@ def yum_install_if_needed(dependencies):
                         # the 'epoch:'
                         pkg = out.split(':', 1)[1].strip()
                         missing_pkgs.append(pkg)
+                        found = True
+                if not found:
+                    logging.warn("No package satisfies dependency: %s" % dep)
 
     if len(missing_pkgs) > 0:
         logging.info("Installing packages: %s" % ' '.join(missing_pkgs))
