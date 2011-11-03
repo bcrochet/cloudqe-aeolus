@@ -352,6 +352,11 @@ class Conductor (AeolusModule):
         cmd = '/usr/bin/aeolus-check-services'
         (rc, out) = call(cmd)
 
+    def install(self):
+        '''install some meta package deps too'''
+        logging.info("Installing '%s*' using yum" % self.name)
+        call('yum -y install "%s*"' % self.name)
+
 class Configure (AeolusModule):
     name = 'aeolus-configure'
     git_url = 'git://github.com/aeolusproject/aeolus-configure.git'
