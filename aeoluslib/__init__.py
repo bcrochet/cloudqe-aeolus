@@ -326,7 +326,6 @@ class AeolusModule(object):
                 else:
                     logging.error("Unknown json data format: %s" % type(json_data))
             else:
-                # git ls-remote git://git.fedorahosted.org/git/aeolus/conductor.git refs/heads/master
                 (rc, out) = call("git ls-remote %s refs/heads/%s" % (self.git_url, branch))
                 if rc == 0:
                     out = out.strip() # yank off newline char
