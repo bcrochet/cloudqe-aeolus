@@ -493,12 +493,12 @@ def yum_install_if_needed(dependencies):
                 # would be better handled through some yum API
                 found = False
                 for line in out.split('\n'):
-                    if re.match(r'^\d+:[^\s]+$', out):
+                    if re.match(r'^\d+:[^\s]+$', line):
                         # expected output format from /usr/share/yum-cli/cli.py
                         # resolveDepCli() '%s:%s-%s-%s.%s' % (pkg.epoch,
                         # pkg.name, pkg.version, pkg.release, pkg.arch) strip off
                         # the 'epoch:'
-                        pkg = out.split(':', 1)[1].strip()
+                        pkg = line.split(':', 1)[1].strip()
                         missing_pkgs.append(pkg)
                         found = True
                 if not found:
