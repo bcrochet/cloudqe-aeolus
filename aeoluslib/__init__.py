@@ -140,6 +140,10 @@ class AeolusModule(object):
         deps = list()
         # Gather any 'BuildRequires' from the spec files
         for spec in specfiles:
+            # TODO - instead of pattern matching for requirements, use
+            # rpmspec.  Note, rpmspec is not included in RHEL6 at this time.
+            #  rpmspec -q --requires /path/to/rpm.spec
+            #  rpmspec -q --buildrequires /path/to/rpm.spec
             for br in re.findall(r'^%s:\s+(.*)$' % deptype, \
                open(spec, 'r').read(), re.MULTILINE):
                 # If this is a versioned compare, only split by comma
@@ -260,8 +264,7 @@ class AeolusModule(object):
             # return to old directory
             if os.getcwd() != cwd:
                 os.chdir(cwd)
-
-        # FIXME - pass/fail?
+        return rc
 
     def _make_rpms(self):
         '''Runs self.package_cmd and returns a list of built packages'''
@@ -346,7 +349,7 @@ class Conductor (AeolusModule):
 
     def setup(self):
         '''Run custom configuration after install'''
-        # FIXME - are we looking for a specific result/output from
+        # FIXME - are we looking for a specific result/output?
         logging.info("Running aeolus-check-services")
         cmd = '/usr/bin/aeolus-check-services'
         (rc, out) = call(cmd)
@@ -452,9 +455,6 @@ class Gofer (AeolusModule):
 
 class Matahari (AeolusModule):
     git_url = 'git://github.com/matahari/matahari.git'
-    # FIXME - Once qpid-qmf-devel patch is accepted upstream, the following
-    # list of BuildRequires can be removed in favor of BuildRequires
-    # auto-detection
     package_cmd = 'make rpm'
 
 def yum_install_if_needed(dependencies):
