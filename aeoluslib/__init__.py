@@ -379,10 +379,10 @@ class Configure (AeolusModule):
         cmd = 'aeolus-configure'
         (rc, out) = call(cmd)
 
-class AeolusImage (AeolusModule):
-    name = 'aeolus-image'
-    git_url = 'git://github.com/aeolusproject/aeolus-image.git'
-    package_cmd = 'rake rpm'
+class AeolusCli (AeolusModule):
+    name = 'aeolus-cli'
+    git_url = 'git://github.com/aeolusproject/aeolus-cli.git'
+    package_cmd = 'rake rpms'
 
 class Oz (AeolusModule):
     git_url = 'git://github.com/clalancette/oz.git'
