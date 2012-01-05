@@ -385,7 +385,7 @@ class AeolusCli (AeolusModule):
     package_cmd = 'rake rpms'
 
 class Oz (AeolusModule):
-    git_url = 'git://github.com/clalancette/oz.git'
+    git_url = 'git://github.com/aeolusproject/oz.git'
     # Specify additional custom build-requirements
     build_requires = 'python-virtualenv python-pip'
     unittest_cmd = 'make clean virtualenv unittests'
@@ -404,7 +404,7 @@ class Audrey (AeolusModule):
     git_url = 'git://github.com/aeolusproject/audrey.git'
     unittest_cmd = 'python audrey_start/test_audrey_startup.py'
     package_cmd = 'cd agent && make rpms && cd .. && ' \
-                + 'cd configserver && rake rpm && cd .. && '
+                + 'cd configserver && rake rpm'
 
 class Libdeltacloud (AeolusModule):
     git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
