@@ -403,9 +403,8 @@ class Audrey (AeolusModule):
     #name = 'aeolus-configserver'
     git_url = 'git://github.com/aeolusproject/audrey.git'
     unittest_cmd = 'python audrey_start/test_audrey_startup.py'
-    package_cmd = 'cd configserver && rake rpm && cd .. && ' \
-                + 'cd audrey_puppet && make rpms && cd .. && ' \
-                + 'cd audrey_start && make rpms'
+    package_cmd = 'cd agent && make rpms && cd .. && ' \
+                + 'cd configserver && rake rpm && cd .. && '
 
 class Libdeltacloud (AeolusModule):
     git_url = 'git://git.fedorahosted.org/deltacloud/libdeltacloud.git'
