@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/env bash
 #
 # Helper script to automate downloading and running aeolus-helper
 #
