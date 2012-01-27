@@ -399,6 +399,7 @@ class Iwhd (AeolusModule):
     # Specify additional custom build-requirements
     build_requires = 'gperf'
     git_url = 'git://git.fedorahosted.org/iwhd.git'
+    unittest_cmd = './bootstrap && ./configure && make check'
     package_cmd = './bootstrap && ./configure && make && make rpm'
     def svc_restart(self):
         '''Run mongod before restart iwhd'''
