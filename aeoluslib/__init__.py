@@ -396,6 +396,8 @@ class Imagefactory (AeolusModule):
     package_cmd = 'make rpm'
 
 class Iwhd (AeolusModule):
+    # Specify additional custom build-requirements
+    build_requires = 'gperf'
     git_url = 'git://git.fedorahosted.org/iwhd.git'
     package_cmd = './bootstrap && ./configure && make && make rpm'
 
