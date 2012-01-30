@@ -400,6 +400,14 @@ class Iwhd (AeolusModule):
     build_requires = 'gperf'
     git_url = 'git://git.fedorahosted.org/iwhd.git'
     package_cmd = './bootstrap && ./configure && make && make rpm'
+    def svc_restart(self):
+        '''Run mongod before restart iwhd'''
+        # FIXME - are we looking for a specific result/output?
+        logging.info("Running mongod")
+        cmd = 'service mongod start'
+        (rc, out) = call(cmd)
+        # Call superclass install
+        AeolusModule.svc_restart(self)
 
 class Audrey (AeolusModule):
     #name = 'aeolus-configserver'
